@@ -1,0 +1,576 @@
+/* =========================================================
+   TOOKA DESKTOP
+   Global Dark Theme
+   ========================================================= */
+
+
+/* =========================================================
+   GLOBAL
+   ========================================================= */
+
+QWidget {
+    font-family: "Inter", "Segoe UI", sans-serif;
+    color: #E2E8F0;
+}
+
+QMainWindow {
+    background: #0B1120;
+}
+
+#MainCentralWidget {
+    background: #0B1120;
+}
+
+#RightArea {
+    background: #0B1120;
+}
+
+#PageStack {
+    background: #0B1120;
+}
+
+
+/* =========================================================
+   SCROLLBARS
+   ========================================================= */
+
+QScrollBar:vertical {
+    background: transparent;
+    width: 8px;
+    margin: 4px 2px 4px 2px;
+}
+
+QScrollBar::handle:vertical {
+    background: #334155;
+    border-radius: 4px;
+    min-height: 40px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #475569;
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical {
+    background: transparent;
+}
+
+QScrollBar:horizontal {
+    background: transparent;
+    height: 8px;
+    margin: 2px 4px 2px 4px;
+}
+
+QScrollBar::handle:horizontal {
+    background: #334155;
+    border-radius: 4px;
+    min-width: 40px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background: #475569;
+}
+
+
+/* =========================================================
+   SIDEBAR
+   ========================================================= */
+
+#Sidebar {
+    background: #0F172A;
+    border-right: 1px solid #1E293B;
+}
+
+
+/* =========================================================
+   SIDEBAR LOGO
+   ========================================================= */
+
+#SidebarLogo {
+    color: #F8FAFC;
+    font-size: 22px;
+    font-weight: 700;
+    padding: 15px;
+}
+
+
+/* =========================================================
+   NAVIGATION BUTTON
+   ========================================================= */
+
+#NavButton {
+    min-height: 46px;
+
+    background: transparent;
+
+    border: none;
+    border-radius: 10px;
+
+    padding-left: 16px;
+    padding-right: 12px;
+
+    color: #94A3B8;
+
+    font-size: 14px;
+    font-weight: 500;
+
+    text-align: left;
+}
+
+
+#NavButton:hover {
+    background: #1E293B;
+    color: #F8FAFC;
+}
+
+
+#NavButton:checked {
+    background: #1D4ED8;
+    color: #FFFFFF;
+    font-weight: 600;
+}
+
+
+#NavButton:pressed {
+    background: #1E40AF;
+}
+
+
+/* =========================================================
+   COLLAPSE BUTTON
+   ========================================================= */
+
+#CollapseButton {
+    min-height: 42px;
+
+    background: #1E293B;
+
+    border: 1px solid #334155;
+    border-radius: 10px;
+
+    color: #CBD5E1;
+
+    padding: 8px 12px;
+}
+
+
+#CollapseButton:hover {
+    background: #2563EB;
+    border-color: #3B82F6;
+    color: #FFFFFF;
+}
+
+
+/* =========================================================
+   HEADER
+   ========================================================= */
+
+#Header {
+    min-height: 64px;
+
+    background: #111827;
+
+    border-bottom: 1px solid #1E293B;
+}
+
+
+/* =========================================================
+   HEADER TITLE
+   ========================================================= */
+
+#HeaderTitle {
+    color: #F8FAFC;
+
+    font-size: 18px;
+    font-weight: 700;
+}
+
+
+/* =========================================================
+   SEARCH BOX
+   ========================================================= */
+
+#SearchBox {
+    background: #0F172A;
+
+    border: 1px solid #273449;
+    border-radius: 9px;
+
+    padding-left: 14px;
+    padding-right: 14px;
+
+    color: #F8FAFC;
+
+    font-size: 13px;
+}
+
+
+#SearchBox:focus {
+    border: 1px solid #3B82F6;
+    background: #111827;
+}
+
+
+#SearchBox::placeholder {
+    color: #64748B;
+}
+
+
+/* =========================================================
+   HEADER ICON BUTTON
+   ========================================================= */
+
+#HeaderIcon {
+    min-width: 38px;
+    min-height: 38px;
+
+    background: transparent;
+
+    border: none;
+    border-radius: 9px;
+
+    color: #94A3B8;
+
+    font-size: 16px;
+}
+
+
+#HeaderIcon:hover {
+    background: #1E293B;
+    color: #F8FAFC;
+}
+
+
+#HeaderIcon:pressed {
+    background: #2563EB;
+    color: #FFFFFF;
+}
+
+
+/* =========================================================
+   USER BUTTON
+   ========================================================= */
+
+#UserButton {
+    min-height: 38px;
+
+    background: #1E293B;
+
+    border: 1px solid #334155;
+    border-radius: 9px;
+
+    padding-left: 14px;
+    padding-right: 14px;
+
+    color: #F8FAFC;
+
+    font-size: 13px;
+    font-weight: 500;
+}
+
+
+#UserButton:hover {
+    background: #263449;
+    border-color: #475569;
+}
+
+
+#UserButton:pressed {
+    background: #2563EB;
+    border-color: #3B82F6;
+}
+
+
+/* =========================================================
+   DASHBOARD
+   ========================================================= */
+
+#Dashboard {
+    background: #0B1120;
+}
+
+
+/* =========================================================
+   BASE CARD
+   ========================================================= */
+
+#Card {
+    background: #111827;
+
+    border: 1px solid #1E293B;
+
+    border-radius: 14px;
+}
+
+
+/* =========================================================
+   WELCOME CARD
+   ========================================================= */
+
+#WelcomeTitle {
+    color: #F8FAFC;
+
+    font-size: 28px;
+    font-weight: 700;
+}
+
+
+#WelcomeDescription {
+    color: #94A3B8;
+
+    font-size: 14px;
+
+    line-height: 1.5;
+}
+
+
+#WelcomeDecoration {
+    background: #172554;
+
+    border: 1px solid #1E3A8A;
+
+    border-radius: 14px;
+}
+
+
+/* =========================================================
+   PRIMARY BUTTON
+   ========================================================= */
+
+#PrimaryButton {
+    min-height: 42px;
+
+    background: #2563EB;
+
+    border: none;
+    border-radius: 9px;
+
+    padding-left: 18px;
+    padding-right: 18px;
+
+    color: #FFFFFF;
+
+    font-size: 13px;
+    font-weight: 600;
+}
+
+
+#PrimaryButton:hover {
+    background: #3B82F6;
+}
+
+
+#PrimaryButton:pressed {
+    background: #1D4ED8;
+}
+
+
+/* =========================================================
+   STAT CARDS
+   ========================================================= */
+
+#StatIcon {
+    background: #172554;
+
+    border: 1px solid #1E3A8A;
+    border-radius: 12px;
+
+    color: #60A5FA;
+
+    font-size: 21px;
+    font-weight: 700;
+}
+
+
+#StatTitle {
+    color: #64748B;
+
+    font-size: 12px;
+    font-weight: 500;
+}
+
+
+#StatValue {
+    color: #F8FAFC;
+
+    font-size: 27px;
+    font-weight: 700;
+}
+
+
+#StatSubtitle {
+    color: #22C55E;
+
+    font-size: 11px;
+    font-weight: 500;
+}
+
+
+/* =========================================================
+   SECTION TITLE
+   ========================================================= */
+
+#SectionTitle {
+    color: #F8FAFC;
+
+    font-size: 16px;
+    font-weight: 700;
+}
+
+
+/* =========================================================
+   PROJECT TABLE
+   ========================================================= */
+
+#ProjectsTable {
+    background: transparent;
+
+    border: none;
+
+    color: #E2E8F0;
+
+    gridline-color: transparent;
+
+    selection-background-color: #172554;
+    selection-color: #F8FAFC;
+}
+
+
+#ProjectsTable::item {
+    background: transparent;
+
+    border-bottom: 1px solid #1E293B;
+
+    padding: 10px;
+}
+
+
+#ProjectsTable::item:hover {
+    background: #172033;
+}
+
+
+#ProjectsTable::item:selected {
+    background: #172554;
+    color: #F8FAFC;
+}
+
+
+/* =========================================================
+   TABLE HEADER
+   ========================================================= */
+
+#ProjectsTable QHeaderView::section {
+    background: #0F172A;
+
+    border: none;
+    border-bottom: 1px solid #1E293B;
+
+    padding: 10px;
+
+    color: #64748B;
+
+    font-size: 11px;
+    font-weight: 600;
+}
+
+
+QHeaderView::section {
+    background: #0F172A;
+
+    border: none;
+
+    color: #64748B;
+
+    padding: 9px;
+
+    font-size: 11px;
+    font-weight: 600;
+}
+
+
+/* =========================================================
+   ACTIVITY PANEL
+   ========================================================= */
+
+#ActivityItem {
+    background: transparent;
+
+    border-bottom: 1px solid #1E293B;
+}
+
+
+#ActivityTitle {
+    color: #E2E8F0;
+
+    font-size: 13px;
+    font-weight: 600;
+}
+
+
+#ActivitySubtitle {
+    color: #64748B;
+
+    font-size: 11px;
+}
+
+
+/* =========================================================
+   QUICK ACTIONS
+   ========================================================= */
+
+#QuickActionButton {
+    min-height: 42px;
+
+    background: #0F172A;
+
+    border: 1px solid #1E293B;
+    border-radius: 9px;
+
+    padding-left: 14px;
+    padding-right: 14px;
+
+    color: #CBD5E1;
+
+    font-size: 13px;
+
+    text-align: left;
+}
+
+
+#QuickActionButton:hover {
+    background: #172033;
+
+    border-color: #334155;
+
+    color: #F8FAFC;
+}
+
+
+#QuickActionButton:pressed {
+    background: #1E293B;
+}
+
+
+/* =========================================================
+   PLACEHOLDER / EMPTY PAGES
+   ========================================================= */
+
+QLabel#PageTitle {
+    color: #F8FAFC;
+
+    font-size: 26px;
+    font-weight: 700;
+}
+
+
+QLabel#PageSubtitle {
+    color: #64748B;
+
+    font-size: 13px;
+}
