@@ -1,0 +1,28 @@
+# Desktop GUI
+PySide6>=6.8,<7
+
+# Data Processing
+numpy>=2.0,<3
+pandas>=2.2,<3
+
+# Machine Learning
+scikit-learn>=1.5,<2
+scipy>=1.13,<2
+
+# Deep Learning
+torch>=2.5,<3
+
+# NLP / Transformers
+transformers>=4.45,<5
+
+# Model & Data Utilities
+joblib>=1.4,<2
+
+# Visualization
+matplotlib>=3.9,<4
+
+# Configuration
+PyYAML>=6.0,<7
+
+# Progress / Utilities
+tqdm>=4.66,<5

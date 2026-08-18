@@ -3,7 +3,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
 
-from app.ui.jls_extract_var import MainWindow
+from app.ui.main_window import MainWindow
 
 def load_stylesheet(app: QApplication) -> None:
     """
