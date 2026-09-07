@@ -3,14 +3,12 @@ from PySide6.QtCore import QObject, Signal, Slot
 from app.core.ml.classification.dataset import (
     prepare_classification_data,
 )
-
 from app.core.ml.classification.training import (
     train_classification,
 )
 
 
 class ClassificationWorker(QObject):
-
     finished = Signal(dict)
     error = Signal(str)
     progress = Signal(int)
@@ -23,6 +21,7 @@ class ClassificationWorker(QObject):
         model_name,
         model_params=None,
         feature_selection="No Selection",
+        feature_selection_params=None,
         test_size=0.2,
         random_state=42,
     ):
@@ -31,10 +30,12 @@ class ClassificationWorker(QObject):
         self.dataframe = dataframe
         self.target_column = target_column
         self.model_name = model_name
+
         self.model_params = model_params or {}
 
-        self.feature_selection = (
-            feature_selection
+        self.feature_selection = feature_selection
+        self.feature_selection_params = (
+            feature_selection_params or {}
         )
 
         self.test_size = test_size
@@ -42,34 +43,34 @@ class ClassificationWorker(QObject):
 
         self._cancel_requested = False
 
+    # ---------------------------------------------------------
+    # Run
+    # ---------------------------------------------------------
+
     @Slot()
     def run(self):
-
         try:
+            # -------------------------------------------------
+            # Cancellation
+            # -------------------------------------------------
 
             if self._cancel_requested:
                 return
 
             # -------------------------------------------------
-            # Dataset
+            # Dataset Preparation
             # -------------------------------------------------
 
-            self.status.emit(
-                "Preparing dataset..."
-            )
-
+            self.status.emit("Preparing dataset...")
             self.progress.emit(10)
 
-            (
-                X_train,
-                X_test,
-                y_train,
-                y_test,
-            ) = prepare_classification_data(
-                self.dataframe,
-                self.target_column,
-                test_size=self.test_size,
-                random_state=self.random_state,
+            X_train, X_test, y_train, y_test = (
+                prepare_classification_data(
+                    self.dataframe,
+                    self.target_column,
+                    test_size=self.test_size,
+                    random_state=self.random_state,
+                )
             )
 
             if self._cancel_requested:
@@ -80,21 +81,16 @@ class ClassificationWorker(QObject):
             # -------------------------------------------------
 
             if self.feature_selection == "No Selection":
-
                 self.status.emit(
                     "Feature selection skipped."
                 )
-
-                self.progress.emit(20)
-
             else:
-
                 self.status.emit(
                     f"Selecting features using "
                     f"{self.feature_selection}..."
                 )
 
-                self.progress.emit(20)
+            self.progress.emit(20)
 
             if self._cancel_requested:
                 return
@@ -116,8 +112,9 @@ class ClassificationWorker(QObject):
                 X_test=X_test,
                 y_test=y_test,
                 model_params=self.model_params,
-                feature_selection=(
-                    self.feature_selection
+                feature_selection=self.feature_selection,
+                feature_selection_params=(
+                    self.feature_selection_params
                 ),
             )
 
@@ -125,21 +122,20 @@ class ClassificationWorker(QObject):
                 return
 
             # -------------------------------------------------
-            # Finished
+            # Completed
             # -------------------------------------------------
 
-            self.status.emit(
-                "Training completed."
-            )
-
+            self.status.emit("Training completed.")
             self.progress.emit(100)
 
             self.finished.emit(result)
 
         except Exception as exc:
-
             self.error.emit(str(exc))
 
-    def cancel(self):
+    # ---------------------------------------------------------
+    # Cancel
+    # ---------------------------------------------------------
 
+    def cancel(self):
         self._cancel_requested = True
