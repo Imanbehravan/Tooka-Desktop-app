@@ -5,555 +5,1134 @@ import pandas as pd
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QWidget,
-    QLabel,
     QVBoxLayout,
     QHBoxLayout,
-    QComboBox,
+    QGridLayout,
+    QLabel,
     QPushButton,
+    QComboBox,
+    QCheckBox,
     QProgressBar,
-    QFrame,
+    QTableWidget,
+    QTableWidgetItem,
     QFileDialog,
     QMessageBox,
+    QScrollArea,
+    QFrame,
+    QAbstractItemView,
+    QSizePolicy,
+    QDialog,
 )
 
-from app.core.ml.classification.models import SUPPORTED_MODELS
-from app.workers.classification_controller import (
-    ClassificationController,
-)
+from app.workers.automl_controller import AutoMLController
+from app.pages.automl.hyperparameter_dialog import HyperparameterConfigDialog
 
-from app.core.ml.classification.feature_selection import (
-    SUPPORTED_FEATURE_SELECTION,
-)
 
 class AutoMLPage(QWidget):
-    def __init__(self):
-        super().__init__()
+    """
+    AutoML workspace.
 
-        self.dataset = None
+    Provides:
+    - Dataset loading
+    - Target selection
+    - Problem type selection
+    - Feature selection
+    - Model selection
+    - Hyperparameter tuning
+    - Training progress
+    - Results comparison
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.dataframe = None
         self.dataset_path = None
 
-        self.controller = ClassificationController()
+        self.model_tuning_configs = {}
+
+        self.controller = AutoMLController(self)
 
         self._build_ui()
         self._connect_signals()
 
-    # ---------------------------------------------------------
+    # ============================================================
     # UI
-    # ---------------------------------------------------------
+    # ============================================================
 
     def _build_ui(self):
 
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(30, 30, 30, 30)
-        main_layout.setSpacing(20)
+        # --------------------------------------------------------
+        # Root layout
+        # --------------------------------------------------------
 
-        # -----------------------------------------------------
-        # Header
-        # -----------------------------------------------------
+        root_layout = QVBoxLayout(self)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
 
-        title = QLabel("Classification")
-        title.setObjectName("pageTitle")
+        # --------------------------------------------------------
+        # Scroll Area
+        # --------------------------------------------------------
 
-        subtitle = QLabel(
-            "Train and evaluate machine learning classification models."
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        self.scroll_area.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
-        subtitle.setObjectName("pageSubtitle")
+        self.scroll_area.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
 
-        main_layout.addWidget(title)
-        main_layout.addWidget(subtitle)
+        root_layout.addWidget(self.scroll_area)
 
-        # -----------------------------------------------------
-        # Configuration Card
-        # -----------------------------------------------------
+        # --------------------------------------------------------
+        # Scroll Content
+        # --------------------------------------------------------
 
-        config_card = QFrame()
-        config_card.setObjectName("card")
+        self.content_widget = QWidget()
+        self.content_widget.setObjectName("AutoMLContent")
 
-        config_layout = QVBoxLayout(config_card)
-        config_layout.setContentsMargins(20, 20, 20, 20)
-        config_layout.setSpacing(15)
+        self.content_layout = QVBoxLayout(self.content_widget)
+        self.content_layout.setContentsMargins(24, 20, 24, 32)
+        self.content_layout.setSpacing(18)
 
-        config_title = QLabel("Training Configuration")
-        config_title.setObjectName("sectionTitle")
+        self.scroll_area.setWidget(self.content_widget)
 
-        config_layout.addWidget(config_title)
+        # ========================================================
+        # PAGE HEADER
+        # ========================================================
 
-        # Dataset
-        dataset_row = QHBoxLayout()
+        header_layout = QVBoxLayout()
+        header_layout.setSpacing(6)
 
-        dataset_label = QLabel("Dataset")
-        dataset_label.setFixedWidth(130)
+        self.page_title = QLabel("AutoML")
+        self.page_title.setObjectName("PageTitle")
+
+        self.page_subtitle = QLabel(
+            "Automatically train and compare multiple machine learning models."
+        )
+        self.page_subtitle.setObjectName("PageSubtitle")
+
+        self.page_subtitle.setWordWrap(True)
+
+        header_layout.addWidget(self.page_title)
+        header_layout.addWidget(self.page_subtitle)
+
+        self.content_layout.addLayout(header_layout)
+
+        # ========================================================
+        # DATASET CARD
+        # ========================================================
+
+        dataset_card, dataset_layout = self._create_card(
+            "Dataset",
+            "Load a CSV dataset and select the target column."
+        )
+
+        # File row
+        file_row = QHBoxLayout()
+        file_row.setSpacing(10)
 
         self.dataset_label = QLabel("No dataset selected")
-        self.dataset_label.setObjectName("datasetLabel")
+        self.dataset_label.setObjectName("SecondaryText")
 
-        self.dataset_button = QPushButton("Select CSV")
+        self.dataset_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Preferred
+        )
 
-        dataset_row.addWidget(dataset_label)
-        dataset_row.addWidget(self.dataset_label, 1)
-        dataset_row.addWidget(self.dataset_button)
+        self.browse_button = QPushButton("Browse Dataset")
+        self.browse_button.setObjectName("PrimaryButton")
+        self.browse_button.setMinimumHeight(40)
 
-        config_layout.addLayout(dataset_row)
+        file_row.addWidget(self.dataset_label)
+        file_row.addWidget(self.browse_button)
+
+        dataset_layout.addLayout(file_row)
+
+        # Dataset information
+        info_layout = QHBoxLayout()
+        info_layout.setSpacing(30)
+
+        self.rows_label = QLabel("Rows: -")
+        self.columns_label = QLabel("Columns: -")
+
+        self.rows_label.setObjectName("SecondaryText")
+        self.columns_label.setObjectName("SecondaryText")
+
+        info_layout.addWidget(self.rows_label)
+        info_layout.addWidget(self.columns_label)
+        info_layout.addStretch()
+
+        dataset_layout.addLayout(info_layout)
 
         # Target
-        target_row = QHBoxLayout()
+        target_layout = QGridLayout()
+        target_layout.setHorizontalSpacing(12)
+        target_layout.setVerticalSpacing(8)
 
         target_label = QLabel("Target Column")
-        target_label.setFixedWidth(130)
+        target_label.setObjectName("FieldLabel")
 
         self.target_combo = QComboBox()
-        self.target_combo.setEnabled(False)
+        self.target_combo.setMinimumHeight(38)
 
-        target_row.addWidget(target_label)
-        target_row.addWidget(self.target_combo)
+        target_layout.addWidget(target_label, 0, 0)
+        target_layout.addWidget(self.target_combo, 0, 1)
 
-        config_layout.addLayout(target_row)
+        target_layout.setColumnStretch(1, 1)
 
-        # Model
-        model_row = QHBoxLayout()
+        dataset_layout.addLayout(target_layout)
 
-        model_label = QLabel("Model")
-        model_label.setFixedWidth(130)
+        self.content_layout.addWidget(dataset_card)
 
-        self.model_combo = QComboBox()
-        self.model_combo.addItems(SUPPORTED_MODELS)
+        # ========================================================
+        # CONFIGURATION CARD
+        # ========================================================
 
-        model_row.addWidget(model_label)
-        model_row.addWidget(self.model_combo)
+        config_card, config_layout = self._create_card(
+            "AutoML Configuration",
+            "Configure preprocessing, feature selection and tuning."
+        )
 
-        config_layout.addLayout(model_row)
+        # --------------------------------------------------------
+        # Problem Type
+        # --------------------------------------------------------
 
-        # Train button
-        self.train_button = QPushButton("Start Training")
-        self.train_button.setObjectName("primaryButton")
-        self.train_button.setMinimumHeight(42)
+        problem_grid = QGridLayout()
+        problem_grid.setHorizontalSpacing(16)
+        problem_grid.setVerticalSpacing(12)
 
-        config_layout.addWidget(self.train_button)
+        problem_label = QLabel("Problem Type")
+        problem_label.setObjectName("FieldLabel")
 
-        main_layout.addWidget(config_card)
+        self.problem_type_combo = QComboBox()
+        self.problem_type_combo.addItems(
+            [
+                "Classification",
+                "Regression",
+            ]
+        )
+        self.problem_type_combo.setMinimumHeight(38)
 
-        # -----------------------------------------------------
-        # Progress Card
-        # -----------------------------------------------------
+        problem_grid.addWidget(problem_label, 0, 0)
+        problem_grid.addWidget(self.problem_type_combo, 0, 1)
 
-        progress_card = QFrame()
-        progress_card.setObjectName("card")
+        # --------------------------------------------------------
+        # Feature Selection
+        # --------------------------------------------------------
 
-        progress_layout = QVBoxLayout(progress_card)
-        progress_layout.setContentsMargins(20, 20, 20, 20)
-        progress_layout.setSpacing(10)
+        feature_label = QLabel("Feature Selection")
+        feature_label.setObjectName("FieldLabel")
 
-        progress_title = QLabel("Training Progress")
-        progress_title.setObjectName("sectionTitle")
+        self.feature_selection_combo = QComboBox()
+        self.feature_selection_combo.addItems(
+            [
+                "No Selection",
+                "RFE",
+                "Chi-Square",
+                "ANOVA",
+                "Mutual Information",
+                "Genetic Algorithm",
+                "Particle Swarm Optimization",
+            ]
+        )
+        self.feature_selection_combo.setMinimumHeight(38)
+
+        problem_grid.addWidget(feature_label, 1, 0)
+        problem_grid.addWidget(
+            self.feature_selection_combo,
+            1,
+            1
+        )
+
+        problem_grid.setColumnStretch(1, 1)
+
+        config_layout.addLayout(problem_grid)
+
+        # --------------------------------------------------------
+        # Separator
+        # --------------------------------------------------------
+
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setObjectName("SectionSeparator")
+
+        config_layout.addWidget(separator)
+
+        # --------------------------------------------------------
+        # Hyperparameter Tuning
+        # --------------------------------------------------------
+
+        tuning_title = QLabel("Hyperparameter Tuning")
+        tuning_title.setObjectName("SubsectionTitle")
+
+        config_layout.addWidget(tuning_title)
+
+        tuning_grid = QGridLayout()
+        tuning_grid.setHorizontalSpacing(12)
+        tuning_grid.setVerticalSpacing(10)
+
+        self.tuning_checkbox = QCheckBox(
+            "Enable Hyperparameter Tuning"
+        )
+        self.tuning_checkbox.setMinimumHeight(32)
+
+        self.tuning_method_combo = QComboBox()
+        self.tuning_method_combo.addItems(
+            [
+                "Grid Search",
+                "Random Search",
+            ]
+        )
+        self.tuning_method_combo.setEnabled(False)
+        self.tuning_method_combo.setMinimumHeight(38)
+
+        self.configure_tuning_button = QPushButton("Configure")
+        self.configure_tuning_button.setObjectName("SecondaryButton")
+        self.configure_tuning_button.setEnabled(False)
+        self.configure_tuning_button.setMinimumHeight(38)
+
+        tuning_grid.addWidget(
+            self.tuning_checkbox,
+            0,
+            0,
+            1,
+            2
+        )
+
+        method_label = QLabel("Search Method")
+        method_label.setObjectName("FieldLabel")
+
+        tuning_grid.addWidget(
+            method_label,
+            1,
+            0
+        )
+
+        tuning_grid.addWidget(
+            self.tuning_method_combo,
+            1,
+            1
+        )
+
+        tuning_grid.addWidget(
+            self.configure_tuning_button,
+            1,
+            2
+        )
+
+        tuning_grid.setColumnStretch(1, 1)
+
+        config_layout.addLayout(tuning_grid)
+
+        # --------------------------------------------------------
+        # Scoring
+        # --------------------------------------------------------
+
+        scoring_grid = QGridLayout()
+        scoring_grid.setHorizontalSpacing(16)
+
+        scoring_label = QLabel("Scoring")
+        scoring_label.setObjectName("FieldLabel")
+
+        self.scoring_combo = QComboBox()
+        self.scoring_combo.addItems(
+            [
+                "accuracy",
+                "f1",
+                "precision",
+                "recall",
+            ]
+        )
+        self.scoring_combo.setMinimumHeight(38)
+
+        scoring_grid.addWidget(
+            scoring_label,
+            0,
+            0
+        )
+
+        scoring_grid.addWidget(
+            self.scoring_combo,
+            0,
+            1
+        )
+
+        scoring_grid.setColumnStretch(1, 1)
+
+        config_layout.addLayout(scoring_grid)
+
+        self.content_layout.addWidget(config_card)
+
+        # ========================================================
+        # MODELS CARD
+        # ========================================================
+
+        models_card, models_layout = self._create_card(
+            "Models",
+            "Select the machine learning models to evaluate."
+        )
+
+        self.model_checkboxes = {}
+
+        models_grid = QGridLayout()
+        models_grid.setHorizontalSpacing(20)
+        models_grid.setVerticalSpacing(10)
+
+        model_names = [
+            "KNN",
+            "SVM",
+            "MLP",
+            "Random Forest",
+            "Naive Bayes",
+            "Decision Tree",
+        ]
+
+        for index, model_name in enumerate(model_names):
+
+            checkbox = QCheckBox(model_name)
+            checkbox.setChecked(True)
+            checkbox.setMinimumHeight(34)
+
+            self.model_checkboxes[model_name] = checkbox
+
+            row = index // 3
+            column = index % 3
+
+            models_grid.addWidget(
+                checkbox,
+                row,
+                column
+            )
+
+        for column in range(3):
+            models_grid.setColumnStretch(column, 1)
+
+        models_layout.addLayout(models_grid)
+
+        self.content_layout.addWidget(models_card)
+
+        # ========================================================
+        # PROGRESS CARD
+        # ========================================================
+
+        progress_card, progress_layout = self._create_card(
+            "Training Progress",
+            "Monitor the AutoML training process."
+        )
 
         self.status_label = QLabel("Ready")
+        self.status_label.setObjectName("StatusText")
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
+        self.progress_bar.setMinimumHeight(22)
+        self.progress_bar.setTextVisible(True)
 
-        progress_layout.addWidget(progress_title)
         progress_layout.addWidget(self.status_label)
         progress_layout.addWidget(self.progress_bar)
 
-        main_layout.addWidget(progress_card)
+        self.content_layout.addWidget(progress_card)
 
-        # -----------------------------------------------------
-        # Results Card
-        # -----------------------------------------------------
+        # ========================================================
+        # ACTIONS
+        # ========================================================
 
-        results_card = QFrame()
-        results_card.setObjectName("card")
+        actions_layout = QHBoxLayout()
+        actions_layout.setSpacing(10)
 
-        results_layout = QVBoxLayout(results_card)
-        results_layout.setContentsMargins(20, 20, 20, 20)
-        results_layout.setSpacing(15)
+        actions_layout.addStretch()
 
-        results_title = QLabel("Results")
-        results_title.setObjectName("sectionTitle")
+        self.cancel_button = QPushButton("Cancel")
+        self.cancel_button.setObjectName("SecondaryButton")
+        self.cancel_button.setMinimumSize(100, 40)
+        self.cancel_button.setEnabled(False)
 
-        results_layout.addWidget(results_title)
+        self.start_button = QPushButton("Start AutoML")
+        self.start_button.setObjectName("PrimaryButton")
+        self.start_button.setMinimumSize(130, 40)
 
-        self.features_label = QLabel(
-           "Selected Features\nNo results yet."
+        actions_layout.addWidget(self.cancel_button)
+        actions_layout.addWidget(self.start_button)
+
+        self.content_layout.addLayout(actions_layout)
+
+        # ========================================================
+        # RESULTS CARD
+        # ========================================================
+
+        results_card, results_layout = self._create_card(
+            "Results",
+            "Compare the performance of the trained models."
         )
 
-        self.features_label.setWordWrap(True)
+        # Best model
+        best_model_layout = QHBoxLayout()
 
-        results_layout.addWidget(
-           self.features_label
+        best_label = QLabel("Best Model")
+        best_label.setObjectName("FieldLabel")
+
+        self.best_model_value = QLabel("-")
+        self.best_model_value.setObjectName("BestModelValue")
+
+        best_model_layout.addWidget(best_label)
+        best_model_layout.addWidget(self.best_model_value)
+        best_model_layout.addStretch()
+
+        results_layout.addLayout(best_model_layout)
+
+        # Results table
+        self.results_table = QTableWidget()
+
+        self.results_table.setColumnCount(8)
+
+        self.results_table.setHorizontalHeaderLabels(
+            [
+                "Rank",
+                "Model",
+                "Score",
+                "Accuracy",
+                "Precision",
+                "Recall",
+                "F1",
+                "Status",
+            ]
         )
 
-        # Metrics
-        metrics_layout = QHBoxLayout()
+        self.results_table.setMinimumHeight(260)
 
-        self.accuracy_label = self._create_metric(
-            "Accuracy"
+        self.results_table.setAlternatingRowColors(True)
+
+        self.results_table.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers
         )
 
-        self.precision_label = self._create_metric(
-            "Precision"
+        self.results_table.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows
         )
 
-        self.recall_label = self._create_metric(
-            "Recall"
+        self.results_table.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection
         )
 
-        self.f1_label = self._create_metric(
-            "F1 Score"
+        self.results_table.verticalHeader().setVisible(False)
+
+        header = self.results_table.horizontalHeader()
+
+        header.setStretchLastSection(True)
+
+        for column in range(8):
+            header.setSectionResizeMode(
+                column,
+                header.ResizeMode.Stretch
+            )
+
+        results_layout.addWidget(self.results_table)
+
+        self.content_layout.addWidget(results_card)
+
+        # Bottom spacing
+        self.content_layout.addSpacing(20)
+
+    # ============================================================
+    # CARD CREATOR
+    # ============================================================
+
+    def _create_card(self, title, subtitle=None):
+
+        card = QFrame()
+        card.setObjectName("Card")
+
+        card_layout = QVBoxLayout(card)
+
+        card_layout.setContentsMargins(
+            18,
+            16,
+            18,
+            18
         )
 
-        metrics_layout.addWidget(
-            self.accuracy_label
-        )
+        card_layout.setSpacing(12)
 
-        metrics_layout.addWidget(
-            self.precision_label
-        )
+        # Header
+        title_label = QLabel(title)
+        title_label.setObjectName("SectionTitle")
 
-        metrics_layout.addWidget(
-            self.recall_label
-        )
+        card_layout.addWidget(title_label)
 
-        metrics_layout.addWidget(
-            self.f1_label
-        )
+        if subtitle:
 
-        results_layout.addLayout(metrics_layout)
+            subtitle_label = QLabel(subtitle)
+            subtitle_label.setObjectName("SectionSubtitle")
+            subtitle_label.setWordWrap(True)
 
-        # Confusion matrix
-        self.confusion_label = QLabel(
-            "Confusion Matrix\nNo results yet."
-        )
+            card_layout.addWidget(subtitle_label)
 
-        self.confusion_label.setAlignment(
-            Qt.AlignCenter
-        )
+        return card, card_layout
 
-        results_layout.addWidget(
-            self.confusion_label
-        )
-
-        main_layout.addWidget(results_card)
-
-        main_layout.addStretch()
-
-        # Feature Selection
-        feature_row = QHBoxLayout()
-
-        feature_label = QLabel(
-            "Feature Selection"
-        )
-
-        feature_label.setFixedWidth(130)
-
-        self.feature_selection_combo = QComboBox()
-
-        self.feature_selection_combo.addItems(
-            SUPPORTED_FEATURE_SELECTION
-        )
-
-        feature_row.addWidget(
-            feature_label
-        )
-
-        feature_row.addWidget(
-            self.feature_selection_combo
-        )
-
-        config_layout.addLayout(
-            feature_row
-        )
-
-    # ---------------------------------------------------------
-    # Helpers
-    # ---------------------------------------------------------
-
-    def _create_metric(self, title):
-        label = QLabel(
-            f"{title}\n--"
-        )
-
-        label.setAlignment(
-            Qt.AlignCenter
-        )
-
-        label.setMinimumHeight(70)
-
-        return label
-
-    # ---------------------------------------------------------
-    # Signals
-    # ---------------------------------------------------------
+    # ============================================================
+    # SIGNALS
+    # ============================================================
 
     def _connect_signals(self):
 
-        self.dataset_button.clicked.connect(
-            self._select_dataset
+        self.browse_button.clicked.connect(
+            self._browse_dataset
         )
 
-        self.train_button.clicked.connect(
-            self._start_training
+        self.problem_type_combo.currentTextChanged.connect(
+            self._problem_type_changed
         )
 
-        self.target_combo.currentTextChanged.connect(
-            self._target_changed
+        self.tuning_checkbox.toggled.connect(
+            self._toggle_tuning
         )
 
-        self.controller.status.connect(
-            self._on_status
+        self.configure_tuning_button.clicked.connect(
+            self._configure_tuning
+        )
+
+        self.start_button.clicked.connect(
+            self._start_automl
+        )
+
+        self.cancel_button.clicked.connect(
+            self._cancel_automl
+        )
+
+        for checkbox in self.model_checkboxes.values():
+
+            checkbox.toggled.connect(
+                self._model_selection_changed
+            )
+
+        self.controller.started.connect(
+            self._on_started
         )
 
         self.controller.progress.connect(
-            self._on_progress
+            self.progress_bar.setValue
+        )
+
+        self.controller.status.connect(
+            self.status_label.setText
         )
 
         self.controller.finished.connect(
-            self._on_training_finished
+            self._on_finished
         )
 
         self.controller.error.connect(
-            self._on_training_error
+            self._on_error
         )
 
-    # ---------------------------------------------------------
-    # Dataset
-    # ---------------------------------------------------------
+    # ============================================================
+    # DATASET
+    # ============================================================
 
-    def _select_dataset(self):
+    def _browse_dataset(self):
 
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select Dataset",
             "",
-            "CSV Files (*.csv)",
+            "CSV Files (*.csv);;All Files (*)"
         )
 
         if not file_path:
             return
 
         try:
-            df = pd.read_csv(file_path)
 
-            if df.empty:
+            dataframe = pd.read_csv(file_path)
+
+            if dataframe.empty:
                 raise ValueError(
                     "The selected dataset is empty."
                 )
 
-            self.dataset = df
+            self.dataframe = dataframe
             self.dataset_path = Path(file_path)
 
             self.dataset_label.setText(
                 self.dataset_path.name
             )
 
+            self.rows_label.setText(
+                f"Rows: {len(dataframe):,}"
+            )
+
+            self.columns_label.setText(
+                f"Columns: {len(dataframe.columns):,}"
+            )
+
             self.target_combo.clear()
 
             self.target_combo.addItems(
-                list(df.columns)
+                [
+                    str(column)
+                    for column in dataframe.columns
+                ]
             )
 
-            self.target_combo.setEnabled(True)
-
             self.status_label.setText(
-                f"Loaded {len(df)} rows."
+                "Dataset loaded successfully."
             )
 
             self.progress_bar.setValue(0)
-
-            self._clear_results()
 
         except Exception as exc:
 
             QMessageBox.critical(
                 self,
                 "Dataset Error",
-                str(exc),
+                f"Could not load dataset:\n\n{exc}"
             )
 
-    # ---------------------------------------------------------
-    # Target
-    # ---------------------------------------------------------
+    # ============================================================
+    # MODEL SELECTION
+    # ============================================================
 
-    def _target_changed(self, column):
+    def _model_selection_changed(self):
 
-        if column:
+        selected_models = [
+            model_name
+            for model_name, checkbox
+            in self.model_checkboxes.items()
+            if checkbox.isChecked()
+        ]
+
+        # Remove configurations for models
+        # that are no longer selected.
+
+        for model_name in list(
+            self.model_tuning_configs.keys()
+        ):
+
+            if model_name not in selected_models:
+
+                del self.model_tuning_configs[
+                    model_name
+                ]
+
+    # ============================================================
+    # PROBLEM TYPE
+    # ============================================================
+
+    def _problem_type_changed(self, problem_type):
+
+        if problem_type == "Regression":
+
+            self.start_button.setEnabled(False)
+
             self.status_label.setText(
-                f"Target: {column}"
+                "Regression AutoML is not implemented yet."
             )
 
-    # ---------------------------------------------------------
-    # Training
-    # ---------------------------------------------------------
+        else:
 
-    def _start_training(self):
+            if not self.controller.is_running():
 
-        if self.dataset is None:
+                self.start_button.setEnabled(True)
+
+                if self.dataframe is not None:
+
+                    self.status_label.setText(
+                        "Ready"
+                    )
+
+    # ============================================================
+    # HYPERPARAMETER TOGGLE
+    # ============================================================
+
+    def _toggle_tuning(self, enabled):
+
+        self.tuning_method_combo.setEnabled(
+            enabled
+        )
+
+        self.configure_tuning_button.setEnabled(
+            enabled
+        )
+
+        if not enabled:
+
+            self.model_tuning_configs.clear()
+
+            self.status_label.setText(
+                "Hyperparameter tuning disabled."
+            )
+
+        else:
+
+            self.status_label.setText(
+                "Configure hyperparameters for the selected models."
+            )
+
+    # ============================================================
+    # HYPERPARAMETER CONFIGURATION
+    # ============================================================
+
+    def _configure_tuning(self):
+
+        selected_models = [
+            model_name
+            for model_name, checkbox
+            in self.model_checkboxes.items()
+            if checkbox.isChecked()
+        ]
+
+        if not selected_models:
+
+            QMessageBox.warning(
+                self,
+                "Model Required",
+                "Please select at least one model first."
+            )
+
+            return
+
+        tuning_method = (
+            self.tuning_method_combo.currentText()
+        )
+
+        configured_count = 0
+
+        for model_name in selected_models:
+
+            dialog = HyperparameterConfigDialog(
+                model_name=model_name,
+                tuning_method=tuning_method,
+                parent=self,
+            )
+
+            result = dialog.exec()
+
+            if result != QDialog.DialogCode.Accepted:
+
+                return
+
+            config = dialog.get_configuration()
+
+            if not config:
+
+                QMessageBox.warning(
+                    self,
+                    "Configuration Error",
+                    f"No configuration was returned for {model_name}."
+                )
+
+                return
+
+            self.model_tuning_configs[
+                model_name
+            ] = config
+
+            configured_count += 1
+
+        self.status_label.setText(
+            "Hyperparameter configuration saved."
+        )
+
+        QMessageBox.information(
+            self,
+            "Configuration Saved",
+            (
+                "Hyperparameter configuration saved "
+                f"for {configured_count} model(s)."
+            ),
+        )
+
+    # ============================================================
+    # START AUTOML
+    # ============================================================
+
+    def _start_automl(self):
+
+        if self.dataframe is None:
+
             QMessageBox.warning(
                 self,
                 "Dataset Required",
-                "Please select a CSV dataset first.",
+                "Please select a dataset first."
             )
+
             return
 
-        target_column = (
-            self.target_combo.currentText()
-        )
+        if self.problem_type_combo.currentText() != "Classification":
 
-        if not target_column:
+            QMessageBox.information(
+                self,
+                "Not Available",
+                "Regression AutoML is not implemented yet."
+            )
+
+            return
+
+        if not self.target_combo.currentText():
+
             QMessageBox.warning(
                 self,
                 "Target Required",
-                "Please select the target column.",
+                "Please select a target column."
             )
+
             return
 
-        model_name = (
-            self.model_combo.currentText()
+        selected_models = [
+            model_name
+            for model_name, checkbox
+            in self.model_checkboxes.items()
+            if checkbox.isChecked()
+        ]
+
+        if not selected_models:
+
+            QMessageBox.warning(
+                self,
+                "Model Required",
+                "Please select at least one model."
+            )
+
+            return
+
+        # --------------------------------------------------------
+        # Hyperparameter validation
+        # --------------------------------------------------------
+
+        tuning_enabled = (
+            self.tuning_checkbox.isChecked()
         )
+
+        tuning_params = None
+
+        if tuning_enabled:
+
+            missing_models = [
+                model_name
+                for model_name in selected_models
+                if model_name not in self.model_tuning_configs
+            ]
+
+            if missing_models:
+
+                QMessageBox.warning(
+                    self,
+                    "Configuration Required",
+                    (
+                        "Please configure hyperparameters for:\n\n"
+                        + "\n".join(
+                            f"• {model}"
+                            for model in missing_models
+                        )
+                    ),
+                )
+
+                return
+
+            tuning_params = {
+                model_name: self.model_tuning_configs[
+                    model_name
+                ]
+                for model_name in selected_models
+            }
+
+        # --------------------------------------------------------
+        # Feature selection
+        # --------------------------------------------------------
 
         feature_selection = (
             self.feature_selection_combo.currentText()
         )
 
-        self.train_button.setEnabled(False)
-        self.dataset_button.setEnabled(False)
-        self.model_combo.setEnabled(False)
-        self.target_combo.setEnabled(False)
-        self.feature_selection_combo.setEnabled(False)
+        feature_selection_map = {
+            "Genetic Algorithm": "GA",
+            "Particle Swarm Optimization": "PSO",
+        }
+
+        feature_selection = feature_selection_map.get(
+            feature_selection,
+            feature_selection
+        )
+
+        # --------------------------------------------------------
+        # Start
+        # --------------------------------------------------------
+
+        self.results_table.setRowCount(0)
+
+        self.best_model_value.setText("-")
 
         self.progress_bar.setValue(0)
 
         self.status_label.setText(
-            f"Starting {model_name}..."
+            "Starting AutoML..."
         )
 
-        self._clear_results()
+        try:
 
-        self.controller.start_training(
-            dataframe=self.dataset,
-            target_column=target_column,
-            model_name=model_name,
-            feature_selection=feature_selection,
-        )
+            self.controller.start(
+                dataframe=self.dataframe,
+                target_column=self.target_combo.currentText(),
+                model_names=selected_models,
+                feature_selection=feature_selection,
+                hyperparameter_tuning=tuning_enabled,
+                tuning_method=self.tuning_method_combo.currentText(),
+                tuning_params=tuning_params,
+                scoring=self.scoring_combo.currentText(),
+                test_size=0.2,
+                random_state=42,
+            )
 
+        except Exception as exc:
 
-    # ---------------------------------------------------------
-    # Worker callbacks
-    # ---------------------------------------------------------
+            QMessageBox.critical(
+                self,
+                "AutoML Error",
+                str(exc)
+            )
 
-    def _on_status(self, message):
+    # ============================================================
+    # CANCEL
+    # ============================================================
+
+    def _cancel_automl(self):
+
+        if self.controller.is_running():
+
+            self.controller.cancel()
+
+            self.status_label.setText(
+                "Cancelling AutoML..."
+            )
+
+    # ============================================================
+    # STARTED
+    # ============================================================
+
+    def _on_started(self):
+
+        self.start_button.setEnabled(False)
+
+        self.cancel_button.setEnabled(True)
+
+        self.browse_button.setEnabled(False)
 
         self.status_label.setText(
-            message
+            "Starting AutoML..."
         )
 
-    def _on_progress(self, value):
+    # ============================================================
+    # FINISHED
+    # ============================================================
 
-        self.progress_bar.setValue(
-            value
-        )
-
-    def _on_training_finished(self, result):
-
-        self.train_button.setEnabled(True)
-        self.dataset_button.setEnabled(True)
-        self.model_combo.setEnabled(True)
-        self.target_combo.setEnabled(True)
-        self.feature_selection_combo.setEnabled(True)
-
-
-        metrics = result["metrics"]
-
-        selected_features = result[
-            "selected_features"
-        ]
-
-        feature_selection = result[
-            "feature_selection"
-        ]
-
-        self.features_label.setText(
-            "Feature Selection: "
-            f"{feature_selection}\n\n"
-            "Selected Features:\n"
-            + ", ".join(selected_features)
-        )
-
-        self.accuracy_label.setText(
-            f"Accuracy\n{metrics['accuracy']:.4f}"
-        )
-
-        self.precision_label.setText(
-            f"Precision\n{metrics['precision']:.4f}"
-        )
-
-        self.recall_label.setText(
-            f"Recall\n{metrics['recall']:.4f}"
-        )
-
-        self.f1_label.setText(
-            f"F1 Score\n{metrics['f1']:.4f}"
-        )
-
-        confusion_matrix = (
-            result["confusion_matrix"]
-        )
-
-        self.confusion_label.setText(
-            "Confusion Matrix\n\n"
-            + str(confusion_matrix)
-        )
-
-        self.status_label.setText(
-            "Training completed successfully."
-        )
+    def _on_finished(self, result):
 
         self.progress_bar.setValue(100)
 
-    def _on_training_error(self, message):
+        self.status_label.setText(
+            "AutoML completed successfully."
+        )
 
-        self.train_button.setEnabled(True)
-        self.dataset_button.setEnabled(True)
-        self.model_combo.setEnabled(True)
-        self.target_combo.setEnabled(True)
-        self.feature_selection_combo.setEnabled(True)
+        best_model = result.get(
+            "best_model",
+            result.get("model", "-")
+        )
+
+        self.best_model_value.setText(
+            str(best_model)
+        )
+
+        self._display_results(result)
+
+        self._restore_controls()
+
+    # ============================================================
+    # ERROR
+    # ============================================================
+
+    def _on_error(self, message):
 
         self.status_label.setText(
-            "Training failed."
+            "AutoML failed."
         )
 
         QMessageBox.critical(
             self,
-            "Training Error",
-            message,
+            "AutoML Error",
+            message
         )
 
-    # ---------------------------------------------------------
-    # Results
-    # ---------------------------------------------------------
+        self._restore_controls()
 
-    def _clear_results(self):
+    # ============================================================
+    # RESTORE
+    # ============================================================
 
-        self.accuracy_label.setText(
-            "Accuracy\n--"
+    def _restore_controls(self):
+
+        self.start_button.setEnabled(
+            self.problem_type_combo.currentText()
+            == "Classification"
         )
 
-        self.precision_label.setText(
-            "Precision\n--"
+        self.cancel_button.setEnabled(False)
+
+        self.browse_button.setEnabled(True)
+
+    # ============================================================
+    # RESULTS
+    # ============================================================
+
+    def _display_results(self, result):
+
+        results = result.get(
+            "results",
+            []
         )
 
-        self.recall_label.setText(
-            "Recall\n--"
+        self.results_table.setRowCount(
+            len(results)
         )
 
-        self.f1_label.setText(
-            "F1 Score\n--"
-        )
+        for row, item in enumerate(results):
 
-        self.confusion_label.setText(
-            "Confusion Matrix\nNo results yet."
-        )
-        self.features_label.setText(
-            "Selected Features\nNo results yet."
-        )
+            values = [
+                item.get("rank", row + 1),
+                item.get("model", "-"),
+                item.get("score", 0),
+                item.get("accuracy", 0),
+                item.get("precision", 0),
+                item.get("recall", 0),
+                item.get("f1", 0),
+                item.get("status", "Completed"),
+            ]
+
+            for column, value in enumerate(values):
+
+                if isinstance(value, float):
+
+                    text = f"{value:.4f}"
+
+                else:
+
+                    text = str(value)
+
+                table_item = QTableWidgetItem(
+                    text
+                )
+
+                table_item.setTextAlignment(
+                    Qt.AlignmentFlag.AlignCenter
+                )
+
+                self.results_table.setItem(
+                    row,
+                    column,
+                    table_item
+                )
+
+        self.results_table.resizeRowsToContents()

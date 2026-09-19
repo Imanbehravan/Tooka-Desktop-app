@@ -15,18 +15,18 @@ class ClassificationController(QObject):
         - Supporting cancellation
     """
 
-    # ---------------------------------------------------------
+    # =========================================================
     # Signals
-    # ---------------------------------------------------------
+    # =========================================================
 
     finished = Signal(dict)
     error = Signal(str)
     progress = Signal(int)
     status = Signal(str)
 
-    # ---------------------------------------------------------
+    # =========================================================
     # Initialization
-    # ---------------------------------------------------------
+    # =========================================================
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -34,9 +34,9 @@ class ClassificationController(QObject):
         self.thread = None
         self.worker = None
 
-    # ---------------------------------------------------------
+    # =========================================================
     # Start Classification
-    # ---------------------------------------------------------
+    # =========================================================
 
     def start_training(
         self,
@@ -46,20 +46,40 @@ class ClassificationController(QObject):
         model_params=None,
         feature_selection="No Selection",
         feature_selection_params=None,
+        hyperparameter_tuning=False,
+        tuning_method="Grid Search",
+        tuning_params=None,
         test_size=0.2,
         random_state=42,
     ):
         """
         Start classification training in a background thread.
+
+        The complete pipeline supports:
+
+            Dataset
+                ↓
+            Feature Selection
+                ↓
+            Hyperparameter Tuning
+                ↓
+            Model Training
+                ↓
+            Evaluation
         """
 
-        # Prevent starting another training while one
-        # is already running.
+        # -----------------------------------------------------
+        # Prevent duplicate training
+        # -----------------------------------------------------
+
         if self.thread is not None:
+
             if self.thread.isRunning():
+
                 self.error.emit(
                     "A classification training task is already running."
                 )
+
                 return
 
         # -----------------------------------------------------
@@ -72,33 +92,58 @@ class ClassificationController(QObject):
             feature_selection_params or {}
         )
 
+        tuning_params = tuning_params or {}
+
         # -----------------------------------------------------
-        # Thread
+        # Create Thread
         # -----------------------------------------------------
 
         self.thread = QThread()
 
         # -----------------------------------------------------
-        # Worker
+        # Create Worker
         # -----------------------------------------------------
 
         self.worker = ClassificationWorker(
+
             dataframe=dataframe,
+
             target_column=target_column,
+
             model_name=model_name,
+
             model_params=model_params,
+
             feature_selection=feature_selection,
-            feature_selection_params=feature_selection_params,
+
+            feature_selection_params=(
+                feature_selection_params
+            ),
+
+            hyperparameter_tuning=(
+                hyperparameter_tuning
+            ),
+
+            tuning_method=tuning_method,
+
+            tuning_params=tuning_params,
+
             test_size=test_size,
+
             random_state=random_state,
         )
 
-        # Move worker to background thread
-        self.worker.moveToThread(self.thread)
+        # -----------------------------------------------------
+        # Move Worker → Background Thread
+        # -----------------------------------------------------
 
-        # -----------------------------------------------------
+        self.worker.moveToThread(
+            self.thread
+        )
+
+        # =====================================================
         # Worker → Controller
-        # -----------------------------------------------------
+        # =====================================================
 
         self.worker.finished.connect(
             self._on_finished
@@ -116,17 +161,17 @@ class ClassificationController(QObject):
             self.status.emit
         )
 
-        # -----------------------------------------------------
-        # Thread Signals
-        # -----------------------------------------------------
+        # =====================================================
+        # Thread → Worker
+        # =====================================================
 
         self.thread.started.connect(
             self.worker.run
         )
 
-        # -----------------------------------------------------
+        # =====================================================
         # Cleanup
-        # -----------------------------------------------------
+        # =====================================================
 
         self.worker.finished.connect(
             self.thread.quit
@@ -140,37 +185,41 @@ class ClassificationController(QObject):
             self._cleanup
         )
 
-        # -----------------------------------------------------
-        # Start
-        # -----------------------------------------------------
+        # =====================================================
+        # Start Thread
+        # =====================================================
 
         self.thread.start()
 
-    # ---------------------------------------------------------
+    # =========================================================
     # Finished
-    # ---------------------------------------------------------
+    # =========================================================
 
     def _on_finished(self, result):
         """
         Handle successful training.
         """
 
-        self.finished.emit(result)
+        self.finished.emit(
+            result
+        )
 
-    # ---------------------------------------------------------
+    # =========================================================
     # Error
-    # ---------------------------------------------------------
+    # =========================================================
 
     def _on_error(self, message):
         """
         Handle worker errors.
         """
 
-        self.error.emit(message)
+        self.error.emit(
+            message
+        )
 
-    # ---------------------------------------------------------
+    # =========================================================
     # Cancel
-    # ---------------------------------------------------------
+    # =========================================================
 
     def cancel(self):
         """
@@ -178,11 +227,12 @@ class ClassificationController(QObject):
         """
 
         if self.worker is not None:
+
             self.worker.cancel()
 
-    # ---------------------------------------------------------
+    # =========================================================
     # Cleanup
-    # ---------------------------------------------------------
+    # =========================================================
 
     def _cleanup(self):
         """
@@ -190,9 +240,11 @@ class ClassificationController(QObject):
         """
 
         if self.worker is not None:
+
             self.worker.deleteLater()
 
         if self.thread is not None:
+
             self.thread.deleteLater()
 
         self.worker = None
