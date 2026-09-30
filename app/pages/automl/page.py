@@ -4,230 +4,451 @@ import pandas as pd
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QGridLayout,
-    QLabel,
-    QPushButton,
-    QComboBox,
-    QCheckBox,
-    QProgressBar,
-    QTableWidget,
-    QTableWidgetItem,
-    QFileDialog,
-    QMessageBox,
-    QScrollArea,
-    QFrame,
-    QAbstractItemView,
-    QSizePolicy,
-    QDialog,
+QWidget,
+QVBoxLayout,
+QHBoxLayout,
+QGridLayout,
+QLabel,
+QPushButton,
+QComboBox,
+QCheckBox,
+QProgressBar,
+QTableWidget,
+QTableWidgetItem,
+QFileDialog,
+QMessageBox,
+QScrollArea,
+QFrame,
+QAbstractItemView,
+QSizePolicy,
+QSpinBox,
+QDoubleSpinBox,
 )
 
 from app.workers.automl_controller import AutoMLController
-from app.pages.automl.hyperparameter_dialog import HyperparameterConfigDialog
-
+from app.workers.clustering_controller import ClusteringController
 
 class AutoMLPage(QWidget):
-    """
-    AutoML workspace.
-
-    Provides:
-    - Dataset loading
-    - Target selection
-    - Problem type selection
-    - Feature selection
-    - Model selection
-    - Hyperparameter tuning
-    - Training progress
-    - Results comparison
-    """
 
     def __init__(self, parent=None):
         super().__init__(parent)
+
+        self.setObjectName("AutoMLPage")
+
+        # =========================================================
+        # State
+        # =========================================================
 
         self.dataframe = None
         self.dataset_path = None
 
         self.model_tuning_configs = {}
+        self.clustering_tuning_params = None
 
-        self.controller = AutoMLController(self)
+        # =========================================================
+        # Controllers
+        # =========================================================
+
+        self.classification_controller = AutoMLController(self)
+        self.clustering_controller = ClusteringController(self)
+
+        # =========================================================
+        # UI
+        # =========================================================
 
         self._build_ui()
         self._connect_signals()
 
-    # ============================================================
+        # Initial state
+        self._problem_type_changed(
+            self.problem_type_combo.currentText()
+        )
+
+        self._clustering_algorithm_changed(
+            self.clustering_algorithm_combo.currentText()
+        )
+
+        self._clustering_feature_changed(
+            self.clustering_feature_combo.currentText()
+        )
+
+    # =============================================================
     # UI
-    # ============================================================
+    # =============================================================
 
     def _build_ui(self):
 
-        # --------------------------------------------------------
-        # Root layout
-        # --------------------------------------------------------
-
         root_layout = QVBoxLayout(self)
-        root_layout.setContentsMargins(0, 0, 0, 0)
+
+        root_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
+        )
+
         root_layout.setSpacing(0)
 
-        # --------------------------------------------------------
+        # =========================================================
         # Scroll Area
-        # --------------------------------------------------------
+        # =========================================================
 
         self.scroll_area = QScrollArea()
+
         self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+
+        self.scroll_area.setFrameShape(
+            QFrame.Shape.NoFrame
+        )
+
         self.scroll_area.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
+
         self.scroll_area.setVerticalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAsNeeded
         )
 
-        root_layout.addWidget(self.scroll_area)
+        root_layout.addWidget(
+            self.scroll_area
+        )
 
-        # --------------------------------------------------------
-        # Scroll Content
-        # --------------------------------------------------------
+        # =========================================================
+        # Content
+        # =========================================================
 
         self.content_widget = QWidget()
-        self.content_widget.setObjectName("AutoMLContent")
 
-        self.content_layout = QVBoxLayout(self.content_widget)
-        self.content_layout.setContentsMargins(24, 20, 24, 32)
-        self.content_layout.setSpacing(18)
+        self.content_widget.setObjectName(
+            "AutoMLContent"
+        )
 
-        self.scroll_area.setWidget(self.content_widget)
+        self.content_layout = QVBoxLayout(
+            self.content_widget
+        )
 
-        # ========================================================
-        # PAGE HEADER
-        # ========================================================
+        self.content_layout.setContentsMargins(
+            24,
+            20,
+            24,
+            32,
+        )
+
+        self.content_layout.setSpacing(
+            18
+        )
+
+        self.scroll_area.setWidget(
+            self.content_widget
+        )
+
+        # =========================================================
+        # Header
+        # =========================================================
 
         header_layout = QVBoxLayout()
+
         header_layout.setSpacing(6)
 
-        self.page_title = QLabel("AutoML")
-        self.page_title.setObjectName("PageTitle")
+        self.page_title = QLabel(
+            "AutoML"
+        )
+
+        self.page_title.setObjectName(
+            "PageTitle"
+        )
 
         self.page_subtitle = QLabel(
-            "Automatically train and compare multiple machine learning models."
+            "Train, configure and evaluate machine learning models."
         )
-        self.page_subtitle.setObjectName("PageSubtitle")
 
-        self.page_subtitle.setWordWrap(True)
+        self.page_subtitle.setObjectName(
+            "PageSubtitle"
+        )
 
-        header_layout.addWidget(self.page_title)
-        header_layout.addWidget(self.page_subtitle)
+        self.page_subtitle.setWordWrap(
+            True
+        )
 
-        self.content_layout.addLayout(header_layout)
+        header_layout.addWidget(
+            self.page_title
+        )
 
-        # ========================================================
-        # DATASET CARD
-        # ========================================================
+        header_layout.addWidget(
+            self.page_subtitle
+        )
+
+        self.content_layout.addLayout(
+            header_layout
+        )
+
+        # =========================================================
+        # Dataset Card
+        # =========================================================
 
         dataset_card, dataset_layout = self._create_card(
             "Dataset",
-            "Load a CSV dataset and select the target column."
+            "Load a CSV dataset for your machine learning task."
         )
 
-        # File row
         file_row = QHBoxLayout()
+
         file_row.setSpacing(10)
 
-        self.dataset_label = QLabel("No dataset selected")
-        self.dataset_label.setObjectName("SecondaryText")
+        self.dataset_label = QLabel(
+            "No dataset selected"
+        )
+
+        self.dataset_label.setObjectName(
+            "SecondaryText"
+        )
 
         self.dataset_label.setSizePolicy(
             QSizePolicy.Policy.Expanding,
-            QSizePolicy.Policy.Preferred
+            QSizePolicy.Policy.Preferred,
         )
 
-        self.browse_button = QPushButton("Browse Dataset")
-        self.browse_button.setObjectName("PrimaryButton")
-        self.browse_button.setMinimumHeight(40)
+        self.browse_button = QPushButton(
+            "Browse Dataset"
+        )
 
-        file_row.addWidget(self.dataset_label)
-        file_row.addWidget(self.browse_button)
+        self.browse_button.setObjectName(
+            "PrimaryButton"
+        )
 
-        dataset_layout.addLayout(file_row)
+        self.browse_button.setMinimumHeight(
+            40
+        )
 
-        # Dataset information
+        file_row.addWidget(
+            self.dataset_label
+        )
+
+        file_row.addWidget(
+            self.browse_button
+        )
+
+        dataset_layout.addLayout(
+            file_row
+        )
+
         info_layout = QHBoxLayout()
-        info_layout.setSpacing(30)
 
-        self.rows_label = QLabel("Rows: -")
-        self.columns_label = QLabel("Columns: -")
+        info_layout.setSpacing(
+            30
+        )
 
-        self.rows_label.setObjectName("SecondaryText")
-        self.columns_label.setObjectName("SecondaryText")
+        self.rows_label = QLabel(
+            "Rows: -"
+        )
 
-        info_layout.addWidget(self.rows_label)
-        info_layout.addWidget(self.columns_label)
+        self.columns_label = QLabel(
+            "Columns: -"
+        )
+
+        self.rows_label.setObjectName(
+            "SecondaryText"
+        )
+
+        self.columns_label.setObjectName(
+            "SecondaryText"
+        )
+
+        info_layout.addWidget(
+            self.rows_label
+        )
+
+        info_layout.addWidget(
+            self.columns_label
+        )
+
         info_layout.addStretch()
 
-        dataset_layout.addLayout(info_layout)
-
-        # Target
-        target_layout = QGridLayout()
-        target_layout.setHorizontalSpacing(12)
-        target_layout.setVerticalSpacing(8)
-
-        target_label = QLabel("Target Column")
-        target_label.setObjectName("FieldLabel")
-
-        self.target_combo = QComboBox()
-        self.target_combo.setMinimumHeight(38)
-
-        target_layout.addWidget(target_label, 0, 0)
-        target_layout.addWidget(self.target_combo, 0, 1)
-
-        target_layout.setColumnStretch(1, 1)
-
-        dataset_layout.addLayout(target_layout)
-
-        self.content_layout.addWidget(dataset_card)
-
-        # ========================================================
-        # CONFIGURATION CARD
-        # ========================================================
-
-        config_card, config_layout = self._create_card(
-            "AutoML Configuration",
-            "Configure preprocessing, feature selection and tuning."
+        dataset_layout.addLayout(
+            info_layout
         )
 
-        # --------------------------------------------------------
-        # Problem Type
-        # --------------------------------------------------------
+        self.content_layout.addWidget(
+            dataset_card
+        )
+
+        # =========================================================
+        # Problem Type Card
+        # =========================================================
+
+        problem_card, problem_layout = self._create_card(
+            "Problem Type",
+            "Choose the machine learning problem you want to solve."
+        )
 
         problem_grid = QGridLayout()
-        problem_grid.setHorizontalSpacing(16)
-        problem_grid.setVerticalSpacing(12)
 
-        problem_label = QLabel("Problem Type")
-        problem_label.setObjectName("FieldLabel")
+        problem_grid.setHorizontalSpacing(
+            16
+        )
+
+        problem_grid.setVerticalSpacing(
+            10
+        )
+
+        problem_label = QLabel(
+            "Problem Type"
+        )
+
+        problem_label.setObjectName(
+            "FieldLabel"
+        )
 
         self.problem_type_combo = QComboBox()
+
         self.problem_type_combo.addItems(
             [
                 "Classification",
-                "Regression",
+                "Clustering",
             ]
         )
-        self.problem_type_combo.setMinimumHeight(38)
 
-        problem_grid.addWidget(problem_label, 0, 0)
-        problem_grid.addWidget(self.problem_type_combo, 0, 1)
+        self.problem_type_combo.setMinimumHeight(
+            38
+        )
 
-        # --------------------------------------------------------
+        problem_grid.addWidget(
+            problem_label,
+            0,
+            0,
+        )
+
+        problem_grid.addWidget(
+            self.problem_type_combo,
+            0,
+            1,
+        )
+
+        problem_grid.setColumnStretch(
+            1,
+            1,
+        )
+
+        problem_layout.addLayout(
+            problem_grid
+        )
+
+        self.content_layout.addWidget(
+            problem_card
+        )
+
+        # =========================================================
+        # Classification Configuration
+        # =========================================================
+
+        self.classification_card = QFrame()
+
+        self.classification_card.setObjectName(
+            "Card"
+        )
+
+        classification_layout = QVBoxLayout(
+            self.classification_card
+        )
+
+        classification_layout.setContentsMargins(
+            18,
+            16,
+            18,
+            18,
+        )
+
+        classification_layout.setSpacing(
+            14
+        )
+
+        classification_title = QLabel(
+            "Classification Configuration"
+        )
+
+        classification_title.setObjectName(
+            "SectionTitle"
+        )
+
+        classification_layout.addWidget(
+            classification_title
+        )
+
+        classification_subtitle = QLabel(
+            "Configure the target column, feature selection, "
+            "models and hyperparameter tuning."
+        )
+
+        classification_subtitle.setObjectName(
+            "SectionSubtitle"
+        )
+
+        classification_subtitle.setWordWrap(
+            True
+        )
+
+        classification_layout.addWidget(
+            classification_subtitle
+        )
+
+        # ---------------------------------------------------------
+        # Target
+        # ---------------------------------------------------------
+
+        target_grid = QGridLayout()
+
+        target_label = QLabel(
+            "Target Column"
+        )
+
+        target_label.setObjectName(
+            "FieldLabel"
+        )
+
+        self.target_combo = QComboBox()
+
+        self.target_combo.setMinimumHeight(
+            38
+        )
+
+        target_grid.addWidget(
+            target_label,
+            0,
+            0,
+        )
+
+        target_grid.addWidget(
+            self.target_combo,
+            0,
+            1,
+        )
+
+        target_grid.setColumnStretch(
+            1,
+            1,
+        )
+
+        classification_layout.addLayout(
+            target_grid
+        )
+
+        # ---------------------------------------------------------
         # Feature Selection
-        # --------------------------------------------------------
+        # ---------------------------------------------------------
 
-        feature_label = QLabel("Feature Selection")
-        feature_label.setObjectName("FieldLabel")
+        feature_grid = QGridLayout()
 
-        self.feature_selection_combo = QComboBox()
-        self.feature_selection_combo.addItems(
+        feature_label = QLabel(
+            "Feature Selection"
+        )
+
+        feature_label.setObjectName(
+            "FieldLabel"
+        )
+
+        self.classification_feature_combo = QComboBox()
+
+        self.classification_feature_combo.addItems(
             [
                 "No Selection",
                 "RFE",
@@ -238,148 +459,133 @@ class AutoMLPage(QWidget):
                 "Particle Swarm Optimization",
             ]
         )
-        self.feature_selection_combo.setMinimumHeight(38)
 
-        problem_grid.addWidget(feature_label, 1, 0)
-        problem_grid.addWidget(
-            self.feature_selection_combo,
-            1,
-            1
+        self.classification_feature_combo.setMinimumHeight(
+            38
         )
 
-        problem_grid.setColumnStretch(1, 1)
+        feature_grid.addWidget(
+            feature_label,
+            0,
+            0,
+        )
 
-        config_layout.addLayout(problem_grid)
+        feature_grid.addWidget(
+            self.classification_feature_combo,
+            0,
+            1,
+        )
 
-        # --------------------------------------------------------
-        # Separator
-        # --------------------------------------------------------
+        feature_grid.setColumnStretch(
+            1,
+            1,
+        )
 
-        separator = QFrame()
-        separator.setFrameShape(QFrame.Shape.HLine)
-        separator.setObjectName("SectionSeparator")
+        classification_layout.addLayout(
+            feature_grid
+        )
 
-        config_layout.addWidget(separator)
+        # ---------------------------------------------------------
+        # Tuning
+        # ---------------------------------------------------------
 
-        # --------------------------------------------------------
-        # Hyperparameter Tuning
-        # --------------------------------------------------------
+        tuning_title = QLabel(
+            "Hyperparameter Tuning"
+        )
 
-        tuning_title = QLabel("Hyperparameter Tuning")
-        tuning_title.setObjectName("SubsectionTitle")
+        tuning_title.setObjectName(
+            "SubsectionTitle"
+        )
 
-        config_layout.addWidget(tuning_title)
+        classification_layout.addWidget(
+            tuning_title
+        )
 
         tuning_grid = QGridLayout()
-        tuning_grid.setHorizontalSpacing(12)
-        tuning_grid.setVerticalSpacing(10)
 
-        self.tuning_checkbox = QCheckBox(
+        self.classification_tuning_checkbox = QCheckBox(
             "Enable Hyperparameter Tuning"
         )
-        self.tuning_checkbox.setMinimumHeight(32)
 
-        self.tuning_method_combo = QComboBox()
-        self.tuning_method_combo.addItems(
+        self.classification_tuning_method = QComboBox()
+
+        self.classification_tuning_method.addItems(
             [
                 "Grid Search",
                 "Random Search",
             ]
         )
-        self.tuning_method_combo.setEnabled(False)
-        self.tuning_method_combo.setMinimumHeight(38)
 
-        self.configure_tuning_button = QPushButton("Configure")
-        self.configure_tuning_button.setObjectName("SecondaryButton")
-        self.configure_tuning_button.setEnabled(False)
-        self.configure_tuning_button.setMinimumHeight(38)
-
-        tuning_grid.addWidget(
-            self.tuning_checkbox,
-            0,
-            0,
-            1,
-            2
+        self.classification_tuning_method.setEnabled(
+            False
         )
 
-        method_label = QLabel("Search Method")
-        method_label.setObjectName("FieldLabel")
+        self.classification_tuning_button = QPushButton(
+            "Configure"
+        )
 
-        tuning_grid.addWidget(
-            method_label,
-            1,
-            0
+        self.classification_tuning_button.setObjectName(
+            "SecondaryButton"
+        )
+
+        self.classification_tuning_button.setEnabled(
+            False
         )
 
         tuning_grid.addWidget(
-            self.tuning_method_combo,
+            self.classification_tuning_checkbox,
+            0,
+            0,
             1,
-            1
+            2,
         )
 
         tuning_grid.addWidget(
-            self.configure_tuning_button,
+            QLabel("Search Method"),
             1,
-            2
-        )
-
-        tuning_grid.setColumnStretch(1, 1)
-
-        config_layout.addLayout(tuning_grid)
-
-        # --------------------------------------------------------
-        # Scoring
-        # --------------------------------------------------------
-
-        scoring_grid = QGridLayout()
-        scoring_grid.setHorizontalSpacing(16)
-
-        scoring_label = QLabel("Scoring")
-        scoring_label.setObjectName("FieldLabel")
-
-        self.scoring_combo = QComboBox()
-        self.scoring_combo.addItems(
-            [
-                "accuracy",
-                "f1",
-                "precision",
-                "recall",
-            ]
-        )
-        self.scoring_combo.setMinimumHeight(38)
-
-        scoring_grid.addWidget(
-            scoring_label,
             0,
-            0
         )
 
-        scoring_grid.addWidget(
-            self.scoring_combo,
-            0,
-            1
+        tuning_grid.addWidget(
+            self.classification_tuning_method,
+            1,
+            1,
         )
 
-        scoring_grid.setColumnStretch(1, 1)
+        tuning_grid.addWidget(
+            self.classification_tuning_button,
+            1,
+            2,
+        )
 
-        config_layout.addLayout(scoring_grid)
+        tuning_grid.setColumnStretch(
+            1,
+            1,
+        )
 
-        self.content_layout.addWidget(config_card)
+        classification_layout.addLayout(
+            tuning_grid
+        )
 
-        # ========================================================
-        # MODELS CARD
-        # ========================================================
+        # ---------------------------------------------------------
+        # Models
+        # ---------------------------------------------------------
 
-        models_card, models_layout = self._create_card(
-            "Models",
-            "Select the machine learning models to evaluate."
+        models_title = QLabel(
+            "Models"
+        )
+
+        models_title.setObjectName(
+            "SubsectionTitle"
+        )
+
+        classification_layout.addWidget(
+            models_title
         )
 
         self.model_checkboxes = {}
 
         models_grid = QGridLayout()
-        models_grid.setHorizontalSpacing(20)
-        models_grid.setVerticalSpacing(10)
 
         model_names = [
             "KNN",
@@ -390,13 +596,25 @@ class AutoMLPage(QWidget):
             "Decision Tree",
         ]
 
-        for index, model_name in enumerate(model_names):
+        for index, model_name in enumerate(
+            model_names
+        ):
 
-            checkbox = QCheckBox(model_name)
-            checkbox.setChecked(True)
-            checkbox.setMinimumHeight(34)
+            checkbox = QCheckBox(
+                model_name
+            )
 
-            self.model_checkboxes[model_name] = checkbox
+            checkbox.setChecked(
+                True
+            )
+
+            checkbox.setMinimumHeight(
+                34
+            )
+
+            self.model_checkboxes[
+                model_name
+            ] = checkbox
 
             row = index // 3
             column = index % 3
@@ -404,90 +622,765 @@ class AutoMLPage(QWidget):
             models_grid.addWidget(
                 checkbox,
                 row,
-                column
+                column,
             )
 
         for column in range(3):
-            models_grid.setColumnStretch(column, 1)
 
-        models_layout.addLayout(models_grid)
+            models_grid.setColumnStretch(
+                column,
+                1,
+            )
 
-        self.content_layout.addWidget(models_card)
+        classification_layout.addLayout(
+            models_grid
+        )
 
-        # ========================================================
-        # PROGRESS CARD
-        # ========================================================
+        # ---------------------------------------------------------
+        # Scoring
+        # ---------------------------------------------------------
+
+        scoring_grid = QGridLayout()
+
+        scoring_label = QLabel(
+            "Scoring"
+        )
+
+        scoring_label.setObjectName(
+            "FieldLabel"
+        )
+
+        self.scoring_combo = QComboBox()
+
+        self.scoring_combo.addItems(
+            [
+                "accuracy",
+                "f1",
+                "precision",
+                "recall",
+            ]
+        )
+
+        self.scoring_combo.setMinimumHeight(
+            38
+        )
+
+        scoring_grid.addWidget(
+            scoring_label,
+            0,
+            0,
+        )
+
+        scoring_grid.addWidget(
+            self.scoring_combo,
+            0,
+            1,
+        )
+
+        scoring_grid.setColumnStretch(
+            1,
+            1,
+        )
+
+        classification_layout.addLayout(
+            scoring_grid
+        )
+
+        self.content_layout.addWidget(
+            self.classification_card
+        )
+
+        # =========================================================
+        # Clustering Configuration
+        # =========================================================
+
+        self.clustering_card = QFrame()
+
+        self.clustering_card.setObjectName(
+            "Card"
+        )
+
+        clustering_layout = QVBoxLayout(
+            self.clustering_card
+        )
+
+        clustering_layout.setContentsMargins(
+            18,
+            16,
+            18,
+            18,
+        )
+
+        clustering_layout.setSpacing(
+            14
+        )
+
+        clustering_title = QLabel(
+            "Clustering Configuration"
+        )
+
+        clustering_title.setObjectName(
+            "SectionTitle"
+        )
+
+        clustering_layout.addWidget(
+            clustering_title
+        )
+
+        clustering_subtitle = QLabel(
+            "Discover hidden groups and patterns in your dataset."
+        )
+
+        clustering_subtitle.setObjectName(
+            "SectionSubtitle"
+        )
+
+        clustering_subtitle.setWordWrap(
+            True
+        )
+
+        clustering_layout.addWidget(
+            clustering_subtitle
+        )
+
+        # ---------------------------------------------------------
+        # Algorithm / Feature Selection
+        # ---------------------------------------------------------
+
+        clustering_grid = QGridLayout()
+
+        clustering_algorithm_label = QLabel(
+            "Algorithm"
+        )
+
+        clustering_algorithm_label.setObjectName(
+            "FieldLabel"
+        )
+
+        self.clustering_algorithm_combo = QComboBox()
+
+        self.clustering_algorithm_combo.addItems(
+            [
+                "KMeans",
+                "DBSCAN",
+                "Agglomerative",
+            ]
+        )
+
+        self.clustering_algorithm_combo.setMinimumHeight(
+            38
+        )
+
+        clustering_feature_label = QLabel(
+            "Feature Selection"
+        )
+
+        clustering_feature_label.setObjectName(
+            "FieldLabel"
+        )
+
+        self.clustering_feature_combo = QComboBox()
+
+        self.clustering_feature_combo.addItems(
+            [
+                "No Selection",
+                "Variance Threshold",
+                "PCA",
+                "Feature Agglomeration",
+            ]
+        )
+
+        self.clustering_feature_combo.setMinimumHeight(
+            38
+        )
+
+        clustering_grid.addWidget(
+            clustering_algorithm_label,
+            0,
+            0,
+        )
+
+        clustering_grid.addWidget(
+            clustering_feature_label,
+            0,
+            1,
+        )
+
+        clustering_grid.addWidget(
+            self.clustering_algorithm_combo,
+            1,
+            0,
+        )
+
+        clustering_grid.addWidget(
+            self.clustering_feature_combo,
+            1,
+            1,
+        )
+
+        clustering_grid.setColumnStretch(
+            0,
+            1,
+        )
+
+        clustering_grid.setColumnStretch(
+            1,
+            1,
+        )
+
+        clustering_layout.addLayout(
+            clustering_grid
+        )
+
+        # ---------------------------------------------------------
+        # Algorithm Parameters
+        # ---------------------------------------------------------
+
+        clustering_parameters_title = QLabel(
+            "Algorithm Parameters"
+        )
+
+        clustering_parameters_title.setObjectName(
+            "SubsectionTitle"
+        )
+
+        clustering_layout.addWidget(
+            clustering_parameters_title
+        )
+
+        # KMeans
+
+        self.kmeans_frame = QFrame()
+
+        kmeans_layout = QHBoxLayout(
+            self.kmeans_frame
+        )
+
+        kmeans_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
+        )
+
+        kmeans_layout.addWidget(
+            QLabel("Number of Clusters")
+        )
+
+        self.kmeans_clusters = QSpinBox()
+
+        self.kmeans_clusters.setRange(
+            2,
+            100,
+        )
+
+        self.kmeans_clusters.setValue(
+            3
+        )
+
+        kmeans_layout.addWidget(
+            self.kmeans_clusters
+        )
+
+        kmeans_layout.addStretch()
+
+        clustering_layout.addWidget(
+            self.kmeans_frame
+        )
+
+        # DBSCAN
+
+        self.dbscan_frame = QFrame()
+
+        dbscan_layout = QGridLayout(
+            self.dbscan_frame
+        )
+
+        dbscan_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
+        )
+
+        dbscan_layout.addWidget(
+            QLabel("Epsilon"),
+            0,
+            0,
+        )
+
+        self.dbscan_eps = QDoubleSpinBox()
+
+        self.dbscan_eps.setRange(
+            0.01,
+            1000.0,
+        )
+
+        self.dbscan_eps.setSingleStep(
+            0.1
+        )
+
+        self.dbscan_eps.setValue(
+            0.5
+        )
+
+        dbscan_layout.addWidget(
+            self.dbscan_eps,
+            0,
+            1,
+        )
+
+        dbscan_layout.addWidget(
+            QLabel("Min Samples"),
+            1,
+            0,
+        )
+
+        self.dbscan_min_samples = QSpinBox()
+
+        self.dbscan_min_samples.setRange(
+            1,
+            1000,
+        )
+
+        self.dbscan_min_samples.setValue(
+            5
+        )
+
+        dbscan_layout.addWidget(
+            self.dbscan_min_samples,
+            1,
+            1,
+        )
+
+        clustering_layout.addWidget(
+            self.dbscan_frame
+        )
+
+        # Agglomerative
+
+        self.agglomerative_frame = QFrame()
+
+        agglomerative_layout = QGridLayout(
+            self.agglomerative_frame
+        )
+
+        agglomerative_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
+        )
+
+        agglomerative_layout.addWidget(
+            QLabel("Number of Clusters"),
+            0,
+            0,
+        )
+
+        self.agg_clusters = QSpinBox()
+
+        self.agg_clusters.setRange(
+            2,
+            100,
+        )
+
+        self.agg_clusters.setValue(
+            3
+        )
+
+        agglomerative_layout.addWidget(
+            self.agg_clusters,
+            0,
+            1,
+        )
+
+        agglomerative_layout.addWidget(
+            QLabel("Linkage"),
+            1,
+            0,
+        )
+
+        self.linkage_combo = QComboBox()
+
+        self.linkage_combo.addItems(
+            [
+                "ward",
+                "complete",
+                "average",
+                "single",
+            ]
+        )
+
+        agglomerative_layout.addWidget(
+            self.linkage_combo,
+            1,
+            1,
+        )
+
+        clustering_layout.addWidget(
+            self.agglomerative_frame
+        )
+
+        # ---------------------------------------------------------
+        # Feature Selection Parameters
+        # ---------------------------------------------------------
+
+        feature_parameters_title = QLabel(
+            "Feature Selection Parameters"
+        )
+
+        feature_parameters_title.setObjectName(
+            "SubsectionTitle"
+        )
+
+        clustering_layout.addWidget(
+            feature_parameters_title
+        )
+
+        self.variance_frame = QFrame()
+
+        variance_layout = QHBoxLayout(
+            self.variance_frame
+        )
+
+        variance_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
+        )
+
+        variance_layout.addWidget(
+            QLabel("Threshold")
+        )
+
+        self.variance_threshold = QDoubleSpinBox()
+
+        self.variance_threshold.setRange(
+            0.0,
+            100000.0,
+        )
+
+        self.variance_threshold.setDecimals(
+            6
+        )
+
+        self.variance_threshold.setValue(
+            0.0
+        )
+
+        variance_layout.addWidget(
+            self.variance_threshold
+        )
+
+        variance_layout.addStretch()
+
+        clustering_layout.addWidget(
+            self.variance_frame
+        )
+
+        self.pca_frame = QFrame()
+
+        pca_layout = QHBoxLayout(
+            self.pca_frame
+        )
+
+        pca_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
+        )
+
+        pca_layout.addWidget(
+            QLabel("Number of Components")
+        )
+
+        self.pca_components = QSpinBox()
+
+        self.pca_components.setRange(
+            1,
+            100,
+        )
+
+        self.pca_components.setValue(
+            2
+        )
+
+        pca_layout.addWidget(
+            self.pca_components
+        )
+
+        pca_layout.addStretch()
+
+        clustering_layout.addWidget(
+            self.pca_frame
+        )
+
+        self.feature_agglomeration_frame = QFrame()
+
+        fa_layout = QHBoxLayout(
+            self.feature_agglomeration_frame
+        )
+
+        fa_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
+        )
+
+        fa_layout.addWidget(
+            QLabel("Number of Clusters")
+        )
+
+        self.feature_agglomeration_clusters = QSpinBox()
+
+        self.feature_agglomeration_clusters.setRange(
+            2,
+            100,
+        )
+
+        self.feature_agglomeration_clusters.setValue(
+            2
+        )
+
+        fa_layout.addWidget(
+            self.feature_agglomeration_clusters
+        )
+
+        fa_layout.addStretch()
+
+        clustering_layout.addWidget(
+            self.feature_agglomeration_frame
+        )
+
+        # ---------------------------------------------------------
+        # Clustering Tuning
+        # ---------------------------------------------------------
+
+        clustering_tuning_title = QLabel(
+            "Hyperparameter Tuning"
+        )
+
+        clustering_tuning_title.setObjectName(
+            "SubsectionTitle"
+        )
+
+        clustering_layout.addWidget(
+            clustering_tuning_title
+        )
+
+        clustering_tuning_layout = QHBoxLayout()
+
+        self.clustering_tuning_checkbox = QCheckBox(
+            "Enable Hyperparameter Tuning"
+        )
+
+        self.clustering_tuning_button = QPushButton(
+            "Configure"
+        )
+
+        self.clustering_tuning_button.setObjectName(
+            "SecondaryButton"
+        )
+
+        self.clustering_tuning_button.setEnabled(
+            False
+        )
+
+        clustering_tuning_layout.addWidget(
+            self.clustering_tuning_checkbox
+        )
+
+        clustering_tuning_layout.addWidget(
+            self.clustering_tuning_button
+        )
+
+        clustering_tuning_layout.addStretch()
+
+        clustering_layout.addLayout(
+            clustering_tuning_layout
+        )
+
+        # ---------------------------------------------------------
+        # Dimensionality Reduction
+        # ---------------------------------------------------------
+
+        self.dim_reduction_checkbox = QCheckBox(
+            "Apply PCA Dimensionality Reduction"
+        )
+
+        clustering_layout.addWidget(
+            self.dim_reduction_checkbox
+        )
+
+        self.content_layout.addWidget(
+            self.clustering_card
+        )
+
+        # =========================================================
+        # Training Card
+        # =========================================================
+
+        training_card, training_layout = self._create_card(
+            "Training",
+            "Start or cancel the current AutoML operation."
+        )
+
+        buttons_layout = QHBoxLayout()
+
+        buttons_layout.addStretch()
+
+        self.cancel_button = QPushButton(
+            "Cancel"
+        )
+
+        self.cancel_button.setObjectName(
+            "SecondaryButton"
+        )
+
+        self.cancel_button.setMinimumSize(
+            100,
+            40,
+        )
+
+        self.cancel_button.setEnabled(
+            False
+        )
+
+        self.start_button = QPushButton(
+            "Start AutoML"
+        )
+
+        self.start_button.setObjectName(
+            "PrimaryButton"
+        )
+
+        self.start_button.setMinimumSize(
+            130,
+            40,
+        )
+
+        buttons_layout.addWidget(
+            self.cancel_button
+        )
+
+        buttons_layout.addWidget(
+            self.start_button
+        )
+
+        training_layout.addLayout(
+            buttons_layout
+        )
+
+        self.content_layout.addWidget(
+            training_card
+        )
+
+        # =========================================================
+        # Progress Card
+        # =========================================================
 
         progress_card, progress_layout = self._create_card(
             "Training Progress",
-            "Monitor the AutoML training process."
+            "Monitor the current operation."
         )
 
-        self.status_label = QLabel("Ready")
-        self.status_label.setObjectName("StatusText")
+        self.status_label = QLabel(
+            "Ready"
+        )
+
+        self.status_label.setObjectName(
+            "StatusText"
+        )
 
         self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setMinimumHeight(22)
-        self.progress_bar.setTextVisible(True)
 
-        progress_layout.addWidget(self.status_label)
-        progress_layout.addWidget(self.progress_bar)
-
-        self.content_layout.addWidget(progress_card)
-
-        # ========================================================
-        # ACTIONS
-        # ========================================================
-
-        actions_layout = QHBoxLayout()
-        actions_layout.setSpacing(10)
-
-        actions_layout.addStretch()
-
-        self.cancel_button = QPushButton("Cancel")
-        self.cancel_button.setObjectName("SecondaryButton")
-        self.cancel_button.setMinimumSize(100, 40)
-        self.cancel_button.setEnabled(False)
-
-        self.start_button = QPushButton("Start AutoML")
-        self.start_button.setObjectName("PrimaryButton")
-        self.start_button.setMinimumSize(130, 40)
-
-        actions_layout.addWidget(self.cancel_button)
-        actions_layout.addWidget(self.start_button)
-
-        self.content_layout.addLayout(actions_layout)
-
-        # ========================================================
-        # RESULTS CARD
-        # ========================================================
-
-        results_card, results_layout = self._create_card(
-            "Results",
-            "Compare the performance of the trained models."
+        self.progress_bar.setRange(
+            0,
+            100,
         )
 
-        # Best model
+        self.progress_bar.setValue(
+            0
+        )
+
+        progress_layout.addWidget(
+            self.status_label
+        )
+
+        progress_layout.addWidget(
+            self.progress_bar
+        )
+
+        self.content_layout.addWidget(
+            progress_card
+        )
+
+        # =========================================================
+        # Classification Results
+        # =========================================================
+
+        self.classification_results_card = QFrame()
+
+        self.classification_results_card.setObjectName(
+            "Card"
+        )
+
+        classification_results_layout = QVBoxLayout(
+            self.classification_results_card
+        )
+
+        classification_results_layout.setContentsMargins(
+            18,
+            16,
+            18,
+            18,
+        )
+
+        results_title = QLabel(
+            "Classification Results"
+        )
+
+        results_title.setObjectName(
+            "SectionTitle"
+        )
+
+        classification_results_layout.addWidget(
+            results_title
+        )
+
         best_model_layout = QHBoxLayout()
 
-        best_label = QLabel("Best Model")
-        best_label.setObjectName("FieldLabel")
+        best_model_layout.addWidget(
+            QLabel("Best Model")
+        )
 
-        self.best_model_value = QLabel("-")
-        self.best_model_value.setObjectName("BestModelValue")
+        self.best_model_value = QLabel(
+            "-"
+        )
 
-        best_model_layout.addWidget(best_label)
-        best_model_layout.addWidget(self.best_model_value)
+        self.best_model_value.setObjectName(
+            "BestModelValue"
+        )
+
+        best_model_layout.addWidget(
+            self.best_model_value
+        )
+
         best_model_layout.addStretch()
 
-        results_layout.addLayout(best_model_layout)
+        classification_results_layout.addLayout(
+            best_model_layout
+        )
 
-        # Results table
         self.results_table = QTableWidget()
 
-        self.results_table.setColumnCount(8)
+        self.results_table.setColumnCount(
+            8
+        )
 
         self.results_table.setHorizontalHeaderLabels(
             [
@@ -502,9 +1395,13 @@ class AutoMLPage(QWidget):
             ]
         )
 
-        self.results_table.setMinimumHeight(260)
+        self.results_table.setMinimumHeight(
+            260
+        )
 
-        self.results_table.setAlternatingRowColors(True)
+        self.results_table.setAlternatingRowColors(
+            True
+        )
 
         self.results_table.setEditTriggers(
             QAbstractItemView.EditTrigger.NoEditTriggers
@@ -518,120 +1415,250 @@ class AutoMLPage(QWidget):
             QAbstractItemView.SelectionMode.SingleSelection
         )
 
-        self.results_table.verticalHeader().setVisible(False)
+        self.results_table.verticalHeader().setVisible(
+            False
+        )
 
         header = self.results_table.horizontalHeader()
 
-        header.setStretchLastSection(True)
+        header.setStretchLastSection(
+            True
+        )
 
         for column in range(8):
+
             header.setSectionResizeMode(
                 column,
-                header.ResizeMode.Stretch
+                header.ResizeMode.Stretch,
             )
 
-        results_layout.addWidget(self.results_table)
+        classification_results_layout.addWidget(
+            self.results_table
+        )
 
-        self.content_layout.addWidget(results_card)
+        self.content_layout.addWidget(
+            self.classification_results_card
+        )
 
-        # Bottom spacing
-        self.content_layout.addSpacing(20)
+        # =========================================================
+        # Clustering Results
+        # =========================================================
 
-    # ============================================================
-    # CARD CREATOR
-    # ============================================================
+        self.clustering_results_card = QFrame()
 
-    def _create_card(self, title, subtitle=None):
+        self.clustering_results_card.setObjectName(
+            "Card"
+        )
 
-        card = QFrame()
-        card.setObjectName("Card")
+        clustering_results_layout = QVBoxLayout(
+            self.clustering_results_card
+        )
 
-        card_layout = QVBoxLayout(card)
-
-        card_layout.setContentsMargins(
+        clustering_results_layout.setContentsMargins(
             18,
             16,
             18,
-            18
+            18,
         )
 
-        card_layout.setSpacing(12)
+        clustering_results_title = QLabel(
+            "Clustering Results"
+        )
 
-        # Header
-        title_label = QLabel(title)
-        title_label.setObjectName("SectionTitle")
+        clustering_results_title.setObjectName(
+            "SectionTitle"
+        )
 
-        card_layout.addWidget(title_label)
+        clustering_results_layout.addWidget(
+            clustering_results_title
+        )
+
+        self.clustering_results_text = QLabel(
+            "No clustering results yet."
+        )
+
+        self.clustering_results_text.setWordWrap(
+            True
+        )
+
+        self.clustering_results_text.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+
+        clustering_results_layout.addWidget(
+            self.clustering_results_text
+        )
+
+        self.content_layout.addWidget(
+            self.clustering_results_card
+        )
+
+        self.content_layout.addSpacing(
+            20
+        )
+
+    # =============================================================
+    # Card
+    # =============================================================
+
+    def _create_card(
+        self,
+        title,
+        subtitle=None,
+    ):
+
+        card = QFrame()
+
+        card.setObjectName(
+            "Card"
+        )
+
+        layout = QVBoxLayout(
+            card
+        )
+
+        layout.setContentsMargins(
+            18,
+            16,
+            18,
+            18,
+        )
+
+        layout.setSpacing(
+            12
+        )
+
+        title_label = QLabel(
+            title
+        )
+
+        title_label.setObjectName(
+            "SectionTitle"
+        )
+
+        layout.addWidget(
+            title_label
+        )
 
         if subtitle:
 
-            subtitle_label = QLabel(subtitle)
-            subtitle_label.setObjectName("SectionSubtitle")
-            subtitle_label.setWordWrap(True)
+            subtitle_label = QLabel(
+                subtitle
+            )
 
-            card_layout.addWidget(subtitle_label)
+            subtitle_label.setObjectName(
+                "SectionSubtitle"
+            )
 
-        return card, card_layout
+            subtitle_label.setWordWrap(
+                True
+            )
 
-    # ============================================================
-    # SIGNALS
-    # ============================================================
+            layout.addWidget(
+                subtitle_label
+            )
+
+        return card, layout
+
+    # =============================================================
+    # Signals
+    # =============================================================
 
     def _connect_signals(self):
+
+        # Dataset
 
         self.browse_button.clicked.connect(
             self._browse_dataset
         )
 
+        # Problem type
+
         self.problem_type_combo.currentTextChanged.connect(
             self._problem_type_changed
         )
 
-        self.tuning_checkbox.toggled.connect(
-            self._toggle_tuning
+        # Classification
+
+        self.classification_tuning_checkbox.toggled.connect(
+            self._classification_tuning_toggled
         )
 
-        self.configure_tuning_button.clicked.connect(
-            self._configure_tuning
-        )
+        for checkbox in self.model_checkboxes.values():
+
+            checkbox.toggled.connect(
+                self._classification_model_changed
+            )
 
         self.start_button.clicked.connect(
             self._start_automl
         )
 
         self.cancel_button.clicked.connect(
-            self._cancel_automl
+            self._cancel
         )
 
-        for checkbox in self.model_checkboxes.values():
+        # Clustering
 
-            checkbox.toggled.connect(
-                self._model_selection_changed
-            )
-
-        self.controller.started.connect(
-            self._on_started
+        self.clustering_algorithm_combo.currentTextChanged.connect(
+            self._clustering_algorithm_changed
         )
 
-        self.controller.progress.connect(
-            self.progress_bar.setValue
+        self.clustering_feature_combo.currentTextChanged.connect(
+            self._clustering_feature_changed
         )
 
-        self.controller.status.connect(
-            self.status_label.setText
+        self.clustering_tuning_checkbox.toggled.connect(
+            self._clustering_tuning_toggled
         )
 
-        self.controller.finished.connect(
-            self._on_finished
+        self.clustering_tuning_button.clicked.connect(
+            self._configure_clustering_tuning
         )
 
-        self.controller.error.connect(
-            self._on_error
+        # Classification controller
+
+        self.classification_controller.started.connect(
+            self._classification_started
         )
 
-    # ============================================================
-    # DATASET
-    # ============================================================
+        self.classification_controller.progress.connect(
+            self._update_progress
+        )
+
+        self.classification_controller.status.connect(
+            self._update_status
+        )
+
+        self.classification_controller.finished.connect(
+            self._classification_finished
+        )
+
+        self.classification_controller.error.connect(
+            self._operation_error
+        )
+
+        # Clustering controller
+
+        self.clustering_controller.progress.connect(
+            self._update_progress
+        )
+
+        self.clustering_controller.status.connect(
+            self._update_status
+        )
+
+        self.clustering_controller.finished.connect(
+            self._clustering_finished
+        )
+
+        self.clustering_controller.error.connect(
+            self._operation_error
+        )
+
+    # =============================================================
+    # Dataset
+    # =============================================================
 
     def _browse_dataset(self):
 
@@ -639,7 +1666,7 @@ class AutoMLPage(QWidget):
             self,
             "Select Dataset",
             "",
-            "CSV Files (*.csv);;All Files (*)"
+            "CSV Files (*.csv);;All Files (*)",
         )
 
         if not file_path:
@@ -647,15 +1674,20 @@ class AutoMLPage(QWidget):
 
         try:
 
-            dataframe = pd.read_csv(file_path)
+            dataframe = pd.read_csv(
+                file_path
+            )
 
             if dataframe.empty:
+
                 raise ValueError(
                     "The selected dataset is empty."
                 )
 
             self.dataframe = dataframe
-            self.dataset_path = Path(file_path)
+            self.dataset_path = Path(
+                file_path
+            )
 
             self.dataset_label.setText(
                 self.dataset_path.name
@@ -678,83 +1710,114 @@ class AutoMLPage(QWidget):
                 ]
             )
 
+            self.model_tuning_configs.clear()
+            self.clustering_tuning_params = None
+
+            self.results_table.setRowCount(
+                0
+            )
+
+            self.best_model_value.setText(
+                "-"
+            )
+
+            self.clustering_results_text.setText(
+                "No clustering results yet."
+            )
+
+            self.progress_bar.setValue(
+                0
+            )
+
             self.status_label.setText(
                 "Dataset loaded successfully."
             )
-
-            self.progress_bar.setValue(0)
 
         except Exception as exc:
 
             QMessageBox.critical(
                 self,
                 "Dataset Error",
-                f"Could not load dataset:\n\n{exc}"
+                f"Could not load dataset:\n\n{exc}",
             )
 
-    # ============================================================
-    # MODEL SELECTION
-    # ============================================================
+    # =============================================================
+    # Problem Type
+    # =============================================================
 
-    def _model_selection_changed(self):
+    def _problem_type_changed(
+        self,
+        problem_type,
+    ):
 
-        selected_models = [
-            model_name
-            for model_name, checkbox
-            in self.model_checkboxes.items()
-            if checkbox.isChecked()
-        ]
+        classification = (
+            problem_type == "Classification"
+        )
 
-        # Remove configurations for models
-        # that are no longer selected.
+        clustering = (
+            problem_type == "Clustering"
+        )
 
-        for model_name in list(
-            self.model_tuning_configs.keys()
-        ):
+        self.classification_card.setVisible(
+            classification
+        )
 
-            if model_name not in selected_models:
+        self.classification_results_card.setVisible(
+            classification
+        )
 
-                del self.model_tuning_configs[
-                    model_name
-                ]
+        self.clustering_card.setVisible(
+            clustering
+        )
 
-    # ============================================================
-    # PROBLEM TYPE
-    # ============================================================
+        self.clustering_results_card.setVisible(
+            clustering
+        )
 
-    def _problem_type_changed(self, problem_type):
+        if classification:
 
-        if problem_type == "Regression":
+            self.start_button.setText(
+                "Start Classification"
+            )
 
-            self.start_button.setEnabled(False)
-
-            self.status_label.setText(
-                "Regression AutoML is not implemented yet."
+            self.page_subtitle.setText(
+                "Automatically train and compare classification models."
             )
 
         else:
 
-            if not self.controller.is_running():
+            self.start_button.setText(
+                "Start Clustering"
+            )
 
-                self.start_button.setEnabled(True)
+            self.page_subtitle.setText(
+                "Discover hidden groups and patterns in your data."
+            )
 
-                if self.dataframe is not None:
+        if not self._is_any_controller_running():
 
-                    self.status_label.setText(
-                        "Ready"
-                    )
+            self.start_button.setEnabled(
+                True
+            )
 
-    # ============================================================
-    # HYPERPARAMETER TOGGLE
-    # ============================================================
+            self.cancel_button.setEnabled(
+                False
+            )
 
-    def _toggle_tuning(self, enabled):
+    # =============================================================
+    # Classification Tuning
+    # =============================================================
 
-        self.tuning_method_combo.setEnabled(
+    def _classification_tuning_toggled(
+        self,
+        enabled,
+    ):
+
+        self.classification_tuning_method.setEnabled(
             enabled
         )
 
-        self.configure_tuning_button.setEnabled(
+        self.classification_tuning_button.setEnabled(
             enabled
         )
 
@@ -766,125 +1829,64 @@ class AutoMLPage(QWidget):
                 "Hyperparameter tuning disabled."
             )
 
-        else:
+    # =============================================================
+    # Classification Models
+    # =============================================================
 
-            self.status_label.setText(
-                "Configure hyperparameters for the selected models."
-            )
-
-    # ============================================================
-    # HYPERPARAMETER CONFIGURATION
-    # ============================================================
-
-    def _configure_tuning(self):
+    def _classification_model_changed(
+        self,
+    ):
 
         selected_models = [
-            model_name
-            for model_name, checkbox
+            name
+            for name, checkbox
             in self.model_checkboxes.items()
             if checkbox.isChecked()
         ]
 
-        if not selected_models:
+        for model_name in list(
+            self.model_tuning_configs.keys()
+        ):
 
-            QMessageBox.warning(
-                self,
-                "Model Required",
-                "Please select at least one model first."
-            )
+            if model_name not in selected_models:
 
-            return
+                del self.model_tuning_configs[
+                    model_name
+                ]
 
-        tuning_method = (
-            self.tuning_method_combo.currentText()
-        )
+    # =============================================================
+    # Classification Start
+    # =============================================================
 
-        configured_count = 0
-
-        for model_name in selected_models:
-
-            dialog = HyperparameterConfigDialog(
-                model_name=model_name,
-                tuning_method=tuning_method,
-                parent=self,
-            )
-
-            result = dialog.exec()
-
-            if result != QDialog.DialogCode.Accepted:
-
-                return
-
-            config = dialog.get_configuration()
-
-            if not config:
-
-                QMessageBox.warning(
-                    self,
-                    "Configuration Error",
-                    f"No configuration was returned for {model_name}."
-                )
-
-                return
-
-            self.model_tuning_configs[
-                model_name
-            ] = config
-
-            configured_count += 1
-
-        self.status_label.setText(
-            "Hyperparameter configuration saved."
-        )
-
-        QMessageBox.information(
-            self,
-            "Configuration Saved",
-            (
-                "Hyperparameter configuration saved "
-                f"for {configured_count} model(s)."
-            ),
-        )
-
-    # ============================================================
-    # START AUTOML
-    # ============================================================
-
-    def _start_automl(self):
+    def _start_classification(self):
 
         if self.dataframe is None:
 
             QMessageBox.warning(
                 self,
                 "Dataset Required",
-                "Please select a dataset first."
+                "Please select a dataset first.",
             )
 
             return
 
-        if self.problem_type_combo.currentText() != "Classification":
+        target = (
+            self.target_combo.currentText()
+        )
 
-            QMessageBox.information(
-                self,
-                "Not Available",
-                "Regression AutoML is not implemented yet."
-            )
-
-            return
-
-        if not self.target_combo.currentText():
+        if not target:
 
             QMessageBox.warning(
                 self,
                 "Target Required",
-                "Please select a target column."
+                "Please select a target column.",
             )
 
             return
 
         selected_models = [
-            model_name
-            for model_name, checkbox
+            name
+            for name, checkbox
             in self.model_checkboxes.items()
             if checkbox.isChecked()
         ]
@@ -894,30 +1896,26 @@ class AutoMLPage(QWidget):
             QMessageBox.warning(
                 self,
                 "Model Required",
-                "Please select at least one model."
+                "Please select at least one model.",
             )
 
             return
 
-        # --------------------------------------------------------
-        # Hyperparameter validation
-        # --------------------------------------------------------
-
         tuning_enabled = (
-            self.tuning_checkbox.isChecked()
+            self.classification_tuning_checkbox.isChecked()
         )
 
         tuning_params = None
 
         if tuning_enabled:
 
-            missing_models = [
-                model_name
-                for model_name in selected_models
-                if model_name not in self.model_tuning_configs
+            missing = [
+                model
+                for model in selected_models
+                if model not in self.model_tuning_configs
             ]
 
-            if missing_models:
+            if missing:
 
                 QMessageBox.warning(
                     self,
@@ -926,7 +1924,7 @@ class AutoMLPage(QWidget):
                         "Please configure hyperparameters for:\n\n"
                         + "\n".join(
                             f"• {model}"
-                            for model in missing_models
+                            for model in missing
                         )
                     ),
                 )
@@ -934,18 +1932,14 @@ class AutoMLPage(QWidget):
                 return
 
             tuning_params = {
-                model_name: self.model_tuning_configs[
-                    model_name
+                model: self.model_tuning_configs[
+                    model
                 ]
-                for model_name in selected_models
+                for model in selected_models
             }
 
-        # --------------------------------------------------------
-        # Feature selection
-        # --------------------------------------------------------
-
         feature_selection = (
-            self.feature_selection_combo.currentText()
+            self.classification_feature_combo.currentText()
         )
 
         feature_selection_map = {
@@ -953,34 +1947,40 @@ class AutoMLPage(QWidget):
             "Particle Swarm Optimization": "PSO",
         }
 
-        feature_selection = feature_selection_map.get(
-            feature_selection,
-            feature_selection
+        feature_selection = (
+            feature_selection_map.get(
+                feature_selection,
+                feature_selection,
+            )
         )
 
-        # --------------------------------------------------------
-        # Start
-        # --------------------------------------------------------
+        self.results_table.setRowCount(
+            0
+        )
 
-        self.results_table.setRowCount(0)
+        self.best_model_value.setText(
+            "-"
+        )
 
-        self.best_model_value.setText("-")
-
-        self.progress_bar.setValue(0)
+        self.progress_bar.setValue(
+            0
+        )
 
         self.status_label.setText(
-            "Starting AutoML..."
+            "Starting classification..."
         )
 
         try:
 
-            self.controller.start(
+            self.classification_controller.start(
                 dataframe=self.dataframe,
-                target_column=self.target_combo.currentText(),
+                target_column=target,
                 model_names=selected_models,
                 feature_selection=feature_selection,
                 hyperparameter_tuning=tuning_enabled,
-                tuning_method=self.tuning_method_combo.currentText(),
+                tuning_method=(
+                    self.classification_tuning_method.currentText()
+                ),
                 tuning_params=tuning_params,
                 scoring=self.scoring_combo.currentText(),
                 test_size=0.2,
@@ -991,103 +1991,551 @@ class AutoMLPage(QWidget):
 
             QMessageBox.critical(
                 self,
-                "AutoML Error",
-                str(exc)
+                "Classification Error",
+                str(exc),
             )
 
-    # ============================================================
-    # CANCEL
-    # ============================================================
+    # =============================================================
+    # Clustering Algorithm
+    # =============================================================
 
-    def _cancel_automl(self):
+    def _clustering_algorithm_changed(
+        self,
+        algorithm,
+    ):
 
-        if self.controller.is_running():
-
-            self.controller.cancel()
-
-            self.status_label.setText(
-                "Cancelling AutoML..."
-            )
-
-    # ============================================================
-    # STARTED
-    # ============================================================
-
-    def _on_started(self):
-
-        self.start_button.setEnabled(False)
-
-        self.cancel_button.setEnabled(True)
-
-        self.browse_button.setEnabled(False)
-
-        self.status_label.setText(
-            "Starting AutoML..."
+        self.kmeans_frame.setVisible(
+            algorithm == "KMeans"
         )
 
-    # ============================================================
-    # FINISHED
-    # ============================================================
+        self.dbscan_frame.setVisible(
+            algorithm == "DBSCAN"
+        )
 
-    def _on_finished(self, result):
+        self.agglomerative_frame.setVisible(
+            algorithm == "Agglomerative"
+        )
 
-        self.progress_bar.setValue(100)
+        self.clustering_tuning_params = None
+
+    # =============================================================
+    # Clustering Feature Selection
+    # =============================================================
+
+    def _clustering_feature_changed(
+        self,
+        method,
+    ):
+
+        self.variance_frame.setVisible(
+            method == "Variance Threshold"
+        )
+
+        self.pca_frame.setVisible(
+            method == "PCA"
+        )
+
+        self.feature_agglomeration_frame.setVisible(
+            method == "Feature Agglomeration"
+        )
+
+    # =============================================================
+    # Clustering Tuning
+    # =============================================================
+
+    def _clustering_tuning_toggled(
+        self,
+        enabled,
+    ):
+
+        self.clustering_tuning_button.setEnabled(
+            enabled
+        )
+
+        if not enabled:
+
+            self.clustering_tuning_params = None
+
+    # =============================================================
+    # Configure Clustering Tuning
+    # =============================================================
+
+    def _configure_clustering_tuning(
+        self,
+    ):
+
+        algorithm = (
+            self.clustering_algorithm_combo.currentText()
+        )
+
+        if algorithm == "KMeans":
+
+            self.clustering_tuning_params = {
+                "cluster_range": (
+                    2,
+                    10,
+                ),
+                "metric": "silhouette",
+            }
+
+        elif algorithm == "DBSCAN":
+
+            self.clustering_tuning_params = {
+                "metric": "silhouette",
+            }
+
+        elif algorithm == "Agglomerative":
+
+            self.clustering_tuning_params = {
+                "cluster_range": (
+                    2,
+                    10,
+                ),
+                "linkage_options": [
+                    "ward",
+                    "complete",
+                    "average",
+                    "single",
+                ],
+                "metric": "silhouette",
+            }
 
         self.status_label.setText(
-            "AutoML completed successfully."
+            "Clustering hyperparameter configuration saved."
+        )
+
+    # =============================================================
+    # Clustering Start
+    # =============================================================
+
+    def _start_clustering(self):
+
+        if self.dataframe is None:
+
+            QMessageBox.warning(
+                self,
+                "Dataset Required",
+                "Please select a dataset first.",
+            )
+
+            return
+
+        algorithm = (
+            self.clustering_algorithm_combo.currentText()
+        )
+
+        params = {}
+
+        if algorithm == "KMeans":
+
+            params = {
+                "n_clusters": (
+                    self.kmeans_clusters.value()
+                )
+            }
+
+        elif algorithm == "DBSCAN":
+
+            params = {
+                "eps": self.dbscan_eps.value(),
+                "min_samples": (
+                    self.dbscan_min_samples.value()
+                ),
+            }
+
+        elif algorithm == "Agglomerative":
+
+            params = {
+                "n_clusters": (
+                    self.agg_clusters.value()
+                ),
+                "linkage": (
+                    self.linkage_combo.currentText()
+                ),
+            }
+
+        feature_selection = (
+            self.clustering_feature_combo.currentText()
+        )
+
+        feature_selection_params = {}
+
+        if feature_selection == "Variance Threshold":
+
+            feature_selection_params = {
+                "threshold": (
+                    self.variance_threshold.value()
+                )
+            }
+
+        elif feature_selection == "PCA":
+
+            feature_selection_params = {
+                "n_components": (
+                    self.pca_components.value()
+                )
+            }
+
+        elif feature_selection == "Feature Agglomeration":
+
+            feature_selection_params = {
+                "n_clusters": (
+                    self.feature_agglomeration_clusters.value()
+                )
+            }
+
+        tuning_enabled = (
+            self.clustering_tuning_checkbox.isChecked()
+        )
+
+        if (
+            tuning_enabled
+            and not self.clustering_tuning_params
+        ):
+
+            QMessageBox.warning(
+                self,
+                "Hyperparameter Tuning",
+                "Please configure the hyperparameter search first.",
+            )
+
+            return
+
+        use_dim_reduction = (
+            self.dim_reduction_checkbox.isChecked()
+        )
+
+        self.clustering_results_text.setText(
+            "Training clustering model..."
+        )
+
+        self.progress_bar.setValue(
+            0
+        )
+
+        self.status_label.setText(
+            "Starting clustering..."
+        )
+
+        try:
+
+            self.clustering_controller.start_clustering(
+                dataframe=self.dataframe,
+                algorithm=algorithm,
+                params=params,
+                feature_selection=feature_selection,
+                feature_selection_params=(
+                    feature_selection_params
+                ),
+                use_dim_reduction=(
+                    use_dim_reduction
+                ),
+                hyperparameter_tuning=(
+                    tuning_enabled
+                ),
+                tuning_params=(
+                    self.clustering_tuning_params
+                ),
+            )
+
+        except Exception as exc:
+
+            QMessageBox.critical(
+                self,
+                "Clustering Error",
+                str(exc),
+            )
+
+            self._set_running_state(
+                False
+            )
+
+    # =============================================================
+    # Start AutoML
+    # =============================================================
+
+    def _start_automl(self):
+
+        problem_type = (
+            self.problem_type_combo.currentText()
+        )
+
+        if problem_type == "Classification":
+
+            self._start_classification()
+
+        elif problem_type == "Clustering":
+
+            self._start_clustering()
+
+    # =============================================================
+    # Cancel
+    # =============================================================
+
+    def _cancel(self):
+
+        if self._is_any_controller_running():
+
+            QMessageBox.information(
+                self,
+                "Cancellation",
+                "Cancellation is not available yet.",
+            )
+
+    # =============================================================
+    # Controller State
+    # =============================================================
+
+    def _is_controller_running(
+        self,
+        controller,
+    ):
+
+        thread = getattr(
+            controller,
+            "thread",
+            None,
+        )
+
+        if thread is None:
+
+            return False
+
+        try:
+
+            return thread.isRunning()
+
+        except RuntimeError:
+
+            return False
+
+    # -------------------------------------------------------------
+
+    def _is_any_controller_running(
+        self,
+    ):
+
+        return (
+            self._is_controller_running(
+                self.classification_controller
+            )
+            or
+            self._is_controller_running(
+                self.clustering_controller
+            )
+        )
+
+    # =============================================================
+    # Running State
+    # =============================================================
+
+    def _set_running_state(
+        self,
+        running,
+    ):
+
+        self.start_button.setEnabled(
+            not running
+        )
+
+        self.cancel_button.setEnabled(
+            running
+        )
+
+        self.browse_button.setEnabled(
+            not running
+        )
+
+        self.problem_type_combo.setEnabled(
+            not running
+        )
+
+        # Classification controls
+
+        self.target_combo.setEnabled(
+            not running
+        )
+
+        self.classification_feature_combo.setEnabled(
+            not running
+        )
+
+        self.classification_tuning_checkbox.setEnabled(
+            not running
+        )
+
+        self.classification_tuning_method.setEnabled(
+            (
+                not running
+                and self.classification_tuning_checkbox.isChecked()
+            )
+        )
+
+        self.classification_tuning_button.setEnabled(
+            (
+                not running
+                and self.classification_tuning_checkbox.isChecked()
+            )
+        )
+
+        self.scoring_combo.setEnabled(
+            not running
+        )
+
+        for checkbox in self.model_checkboxes.values():
+
+            checkbox.setEnabled(
+                not running
+            )
+
+        # Clustering controls
+
+        self.clustering_algorithm_combo.setEnabled(
+            not running
+        )
+
+        self.clustering_feature_combo.setEnabled(
+            not running
+        )
+
+        self.kmeans_clusters.setEnabled(
+            not running
+        )
+
+        self.dbscan_eps.setEnabled(
+            not running
+        )
+
+        self.dbscan_min_samples.setEnabled(
+            not running
+        )
+
+        self.agg_clusters.setEnabled(
+            not running
+        )
+
+        self.linkage_combo.setEnabled(
+            not running
+        )
+
+        self.variance_threshold.setEnabled(
+            not running
+        )
+
+        self.pca_components.setEnabled(
+            not running
+        )
+
+        self.feature_agglomeration_clusters.setEnabled(
+            not running
+        )
+
+        self.clustering_tuning_checkbox.setEnabled(
+            not running
+        )
+
+        self.clustering_tuning_button.setEnabled(
+            (
+                not running
+                and self.clustering_tuning_checkbox.isChecked()
+            )
+        )
+
+        self.dim_reduction_checkbox.setEnabled(
+            not running
+        )
+
+    # =============================================================
+    # Classification Started
+    # =============================================================
+
+    def _classification_started(
+        self,
+    ):
+
+        self._set_running_state(
+            True
+        )
+
+        self.progress_bar.setValue(
+            0
+        )
+
+        self.status_label.setText(
+            "Classification started."
+        )
+
+    # =============================================================
+    # Progress
+    # =============================================================
+
+    def _update_progress(
+        self,
+        value,
+    ):
+
+        self.progress_bar.setValue(
+            value
+        )
+
+    # =============================================================
+    # Status
+    # =============================================================
+
+    def _update_status(
+        self,
+        message,
+    ):
+
+        self.status_label.setText(
+            message
+        )
+
+    # =============================================================
+    # Classification Finished
+    # =============================================================
+
+    def _classification_finished(
+        self,
+        result,
+    ):
+
+        self.progress_bar.setValue(
+            100
+        )
+
+        self.status_label.setText(
+            "Classification completed successfully."
         )
 
         best_model = result.get(
             "best_model",
-            result.get("model", "-")
+            result.get(
+                "model",
+                "-"
+            ),
         )
 
         self.best_model_value.setText(
             str(best_model)
         )
 
-        self._display_results(result)
-
-        self._restore_controls()
-
-    # ============================================================
-    # ERROR
-    # ============================================================
-
-    def _on_error(self, message):
-
-        self.status_label.setText(
-            "AutoML failed."
+        self._display_classification_results(
+            result
         )
 
-        QMessageBox.critical(
-            self,
-            "AutoML Error",
-            message
+        self._set_running_state(
+            False
         )
 
-        self._restore_controls()
+    # =============================================================
+    # Classification Results
+    # =============================================================
 
-    # ============================================================
-    # RESTORE
-    # ============================================================
-
-    def _restore_controls(self):
-
-        self.start_button.setEnabled(
-            self.problem_type_combo.currentText()
-            == "Classification"
-        )
-
-        self.cancel_button.setEnabled(False)
-
-        self.browse_button.setEnabled(True)
-
-    # ============================================================
-    # RESULTS
-    # ============================================================
-
-    def _display_results(self, result):
+    def _display_classification_results(
+        self,
+        result,
+    ):
 
         results = result.get(
             "results",
@@ -1098,28 +2546,61 @@ class AutoMLPage(QWidget):
             len(results)
         )
 
-        for row, item in enumerate(results):
+        for row, item in enumerate(
+            results
+        ):
 
             values = [
-                item.get("rank", row + 1),
-                item.get("model", "-"),
-                item.get("score", 0),
-                item.get("accuracy", 0),
-                item.get("precision", 0),
-                item.get("recall", 0),
-                item.get("f1", 0),
-                item.get("status", "Completed"),
+                item.get(
+                    "rank",
+                    row + 1
+                ),
+                item.get(
+                    "model",
+                    "-"
+                ),
+                item.get(
+                    "score",
+                    0
+                ),
+                item.get(
+                    "accuracy",
+                    0
+                ),
+                item.get(
+                    "precision",
+                    0
+                ),
+                item.get(
+                    "recall",
+                    0
+                ),
+                item.get(
+                    "f1",
+                    0
+                ),
+                item.get(
+                    "status",
+                    "Completed"
+                ),
             ]
 
-            for column, value in enumerate(values):
+            for column, value in enumerate(
+                values
+            ):
 
-                if isinstance(value, float):
+                if isinstance(
+                    value,
+                    float
+                ):
 
                     text = f"{value:.4f}"
 
                 else:
 
-                    text = str(value)
+                    text = str(
+                        value
+                    )
 
                 table_item = QTableWidgetItem(
                     text
@@ -1136,3 +2617,230 @@ class AutoMLPage(QWidget):
                 )
 
         self.results_table.resizeRowsToContents()
+
+    # =============================================================
+    # Clustering Finished
+    # =============================================================
+
+    def _clustering_finished(
+        self,
+        result,
+    ):
+
+        self.progress_bar.setValue(
+            100
+        )
+
+        self.status_label.setText(
+            "Clustering completed successfully."
+        )
+
+        self._display_clustering_results(
+            result
+        )
+
+        self._set_running_state(
+            False
+        )
+
+    # =============================================================
+    # Clustering Results
+    # =============================================================
+
+    def _display_clustering_results(
+        self,
+        result,
+    ):
+
+        lines = []
+
+        lines.append(
+            "CLUSTERING RESULTS"
+        )
+
+        lines.append(
+            "=" * 50
+        )
+
+        lines.append("")
+
+        model_info = result.get(
+            "model_info",
+            {}
+        )
+
+        algorithm = model_info.get(
+            "algorithm",
+            self.clustering_algorithm_combo.currentText()
+        )
+
+        lines.append(
+            f"Algorithm: {algorithm}"
+        )
+
+        lines.append(
+            "Feature Selection: "
+            f"{result.get('feature_selection', '-')}"
+        )
+
+        tuning_enabled = result.get(
+            "hyperparameter_tuning",
+            False
+        )
+
+        lines.append(
+            "Hyperparameter Tuning: "
+            f"{'Enabled' if tuning_enabled else 'Disabled'}"
+        )
+
+        lines.append("")
+
+        lines.append(
+            "Model Parameters:"
+        )
+
+        for key, value in model_info.items():
+
+            if key == "algorithm":
+
+                continue
+
+            lines.append(
+                f"  {key}: {value}"
+            )
+
+        lines.append("")
+
+        metrics = result.get(
+            "metrics",
+            {}
+        )
+
+        lines.append(
+            "Clustering Metrics:"
+        )
+
+        for metric_name, value in metrics.items():
+
+            if value is None:
+
+                formatted_value = "N/A"
+
+            elif isinstance(
+                value,
+                float
+            ):
+
+                formatted_value = (
+                    f"{value:.6f}"
+                )
+
+            else:
+
+                formatted_value = str(
+                    value
+                )
+
+            lines.append(
+                f"  {metric_name}: "
+                f"{formatted_value}"
+            )
+
+        lines.append("")
+
+        tuning_result = result.get(
+            "tuning_result"
+        )
+
+        if tuning_result:
+
+            lines.append(
+                "Hyperparameter Tuning Result:"
+            )
+
+            best_params = tuning_result.get(
+                "best_params",
+                {}
+            )
+
+            best_score = tuning_result.get(
+                "best_score"
+            )
+
+            for key, value in best_params.items():
+
+                lines.append(
+                    f"  Best {key}: {value}"
+                )
+
+            if best_score is not None:
+
+                lines.append(
+                    "  Best Score: "
+                    f"{float(best_score):.6f}"
+                )
+
+            lines.append("")
+
+        data = result.get(
+            "data"
+        )
+
+        if data is not None:
+
+            try:
+
+                rows, columns = data.shape
+
+                lines.append(
+                    "Transformed Data Shape: "
+                    f"({rows}, {columns})"
+                )
+
+            except AttributeError:
+
+                pass
+
+        labels = result.get(
+            "labels"
+        )
+
+        if labels is not None:
+
+            lines.append(
+                f"Number of Samples: {len(labels)}"
+            )
+
+        self.clustering_results_text.setText(
+            "<pre>"
+            + "\n".join(lines)
+            + "</pre>"
+        )
+
+    # =============================================================
+    # Error
+    # =============================================================
+
+    def _operation_error(
+        self,
+        message,
+    ):
+
+        self.progress_bar.setValue(
+            0
+        )
+
+        self.status_label.setText(
+            "Training failed."
+        )
+
+        self._set_running_state(
+            False
+        )
+
+        QMessageBox.critical(
+            self,
+            "AutoML Error",
+            message,
+        )
+    

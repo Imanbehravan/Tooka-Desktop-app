@@ -8,7 +8,6 @@ from app.pages.deploy.page import DeployPage
 from app.pages.monitoring.page import MonitoringPage
 from app.pages.settings.page import SettingsPage
 
-
 class PageStack(QStackedWidget):
 
     def __init__(self):
@@ -21,3 +20,4 @@ class PageStack(QStackedWidget):
         self.addWidget(DeployPage())
         self.addWidget(MonitoringPage())
         self.addWidget(SettingsPage())
+        
