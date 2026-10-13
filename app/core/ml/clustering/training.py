@@ -34,19 +34,11 @@ def train_clustering(
 
     params = params or {}
 
-    # Clustering in the original project operates
-    # directly on dataframe values.
     X = dataframe.values
 
-    # Optional dimensionality reduction.
-    # This follows the original tasks.py behavior:
-    # PCA is applied BEFORE clustering.
+    # Same behavior as the original project:
+    # PCA is applied before clustering.
     if use_dim_reduction:
-        if X.shape[1] < 2:
-            raise ValueError(
-                "PCA dimensionality reduction requires at least 2 features."
-            )
-
         pca = PCA(n_components=2)
         X = pca.fit_transform(X)
 
@@ -55,8 +47,6 @@ def train_clustering(
         params=params,
     )
 
-    # KMeans and DBSCAN expose fit_predict.
-    # Agglomerative also supports fit_predict.
     labels = model.fit_predict(X)
 
     metrics = evaluate_clustering(

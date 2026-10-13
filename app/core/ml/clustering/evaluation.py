@@ -1,8 +1,4 @@
-from sklearn.metrics import (
-    calinski_harabasz_score,
-    davies_bouldin_score,
-    silhouette_score,
-)
+from sklearn.metrics import silhouette_score
 
 
 def evaluate_clustering(
@@ -15,61 +11,78 @@ def evaluate_clustering(
     Evaluate clustering results.
 
     Metrics:
-        - silhouette_score
-        - calinski_harabasz_score
-        - davies_bouldin_score
         - inertia for KMeans
-        - n_clusters
+        - silhouette_score
+        - n_clusters for DBSCAN
+        - n_clusters for Agglomerative
     """
 
-    unique_labels = set(labels)
+    # ---------------------------------------------------------
+    # KMeans
+    # ---------------------------------------------------------
 
-    # DBSCAN noise label (-1) is not a cluster.
-    if -1 in unique_labels:
-        n_clusters = len(unique_labels) - 1
-    else:
-        n_clusters = len(unique_labels)
+    if algorithm == "KMeans":
 
-    metrics = {
-        "n_clusters": n_clusters,
-        "silhouette_score": None,
-        "calinski_harabasz_score": None,
-        "davies_bouldin_score": None,
-    }
+        metric_value = (
+            silhouette_score(X, labels)
+            if len(set(labels)) > 1
+            else None
+        )
 
-    # Most clustering metrics require at least
-    # two different clusters.
-    if n_clusters >= 2:
-        try:
-            metrics["silhouette_score"] = silhouette_score(
-                X,
-                labels,
-            )
-        except Exception:
-            pass
+        metrics = {
+            "inertia": model.inertia_,
+            "silhouette_score": metric_value,
+        }
 
-        try:
-            metrics["calinski_harabasz_score"] = (
-                calinski_harabasz_score(
-                    X,
-                    labels,
-                )
-            )
-        except Exception:
-            pass
+        return metrics
 
-        try:
-            metrics["davies_bouldin_score"] = (
-                davies_bouldin_score(
-                    X,
-                    labels,
-                )
-            )
-        except Exception:
-            pass
+    # ---------------------------------------------------------
+    # DBSCAN
+    # ---------------------------------------------------------
 
-    # KMeans-specific metric.
-    if algorithm == "KMeans" and model is not None:
-        metrics["inertia"] = model.inertia_
+    if algorithm == "DBSCAN":
 
-    return metrics
+        n_clusters = (
+            len(set(labels))
+            - (1 if -1 in labels else 0)
+        )
+
+        metric_value = (
+            silhouette_score(X, labels)
+            if n_clusters > 1
+            else None
+        )
+
+        metrics = {
+            "n_clusters": n_clusters,
+            "silhouette_score": metric_value,
+        }
+
+        return metrics
+
+    # ---------------------------------------------------------
+    # Agglomerative
+    # ---------------------------------------------------------
+
+    if algorithm == "Agglomerative":
+
+        metric_value = (
+            silhouette_score(X, labels)
+            if len(set(labels)) > 1
+            else None
+        )
+
+        metrics = {
+            "n_clusters": len(set(labels)),
+            "silhouette_score": metric_value,
+        }
+
+        return metrics
+
+    # ---------------------------------------------------------
+    # Unsupported algorithm
+    # ---------------------------------------------------------
+
+    raise ValueError(
+        f"Unsupported algorithm: {algorithm}"
+    )

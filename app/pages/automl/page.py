@@ -23,10 +23,14 @@ QAbstractItemView,
 QSizePolicy,
 QSpinBox,
 QDoubleSpinBox,
+QDialog,
 )
 
 from app.workers.automl_controller import AutoMLController
 from app.workers.clustering_controller import ClusteringController
+from app.pages.clustering.hyperparameter_dialog import (
+    ClusteringTuningDialog,
+)
 
 class AutoMLPage(QWidget):
 
@@ -2060,50 +2064,34 @@ class AutoMLPage(QWidget):
     # Configure Clustering Tuning
     # =============================================================
 
-    def _configure_clustering_tuning(
-        self,
-    ):
+    def _configure_clustering_tuning(self):
 
         algorithm = (
             self.clustering_algorithm_combo.currentText()
         )
 
-        if algorithm == "KMeans":
+        dialog = ClusteringTuningDialog(
+            algorithm=algorithm,
+            parent=self,
+            initial_params=(
+                self.clustering_tuning_params
+                or {}
+            ),
+        )
 
-            self.clustering_tuning_params = {
-                "cluster_range": (
-                    2,
-                    10,
-                ),
-                "metric": "silhouette",
-            }
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
 
-        elif algorithm == "DBSCAN":
+        params = dialog.get_params()
 
-            self.clustering_tuning_params = {
-                "metric": "silhouette",
-            }
+        if not params:
+            return
 
-        elif algorithm == "Agglomerative":
-
-            self.clustering_tuning_params = {
-                "cluster_range": (
-                    2,
-                    10,
-                ),
-                "linkage_options": [
-                    "ward",
-                    "complete",
-                    "average",
-                    "single",
-                ],
-                "metric": "silhouette",
-            }
+        self.clustering_tuning_params = params
 
         self.status_label.setText(
             "Clustering hyperparameter configuration saved."
         )
-
     # =============================================================
     # Clustering Start
     # =============================================================

@@ -343,11 +343,11 @@ The project is currently under active development.
 * [x] ML Core extraction
 * [x] Classification integration
 * [ ] Regression integration
-* [ ] Clustering integration
+* [x] Clustering integration
 * [ ] Time Series integration
 * [ ] XAI integration
 * [ ] Dataset management
-* [ ] Model management
+* [x] Model management
 * [ ] Training interface
 * [ ] Results visualization
 * [ ] Windows packaging

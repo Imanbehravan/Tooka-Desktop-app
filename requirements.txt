@@ -26,3 +26,5 @@ PyYAML>=6.0,<7
 
 # Progress / Utilities
 tqdm>=4.66,<5
+
+platformdirs

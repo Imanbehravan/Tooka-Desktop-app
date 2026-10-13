@@ -574,3 +574,146 @@ QLabel#PageSubtitle {
 
     font-size: 13px;
 }
+
+/* =========================================================
+MODELS PAGE
+========================================================= */
+
+#ModelsPage {
+background: #0B1120;
+}
+
+/* =========================================================
+MODEL FILTER
+========================================================= */
+
+#ModelFilter {
+min-width: 135px;
+
+```
+background: #0F172A;
+
+border: 1px solid #273449;
+border-radius: 9px;
+
+padding-left: 12px;
+padding-right: 12px;
+
+color: #CBD5E1;
+
+font-size: 13px;
+```
+
+}
+
+#ModelFilter:hover {
+border-color: #334155;
+}
+
+#ModelFilter:focus {
+border-color: #3B82F6;
+}
+
+#ModelFilter QAbstractItemView {
+background: #111827;
+
+```
+border: 1px solid #334155;
+
+color: #E2E8F0;
+
+selection-background-color: #1D4ED8;
+selection-color: #FFFFFF;
+
+padding: 4px;
+```
+
+}
+
+/* =========================================================
+MODEL TABLE
+========================================================= */
+
+#ProjectsTable {
+border: 1px solid #1E293B;
+border-radius: 12px;
+}
+
+#ProjectsTable QTableCornerButton::section {
+background: #0F172A;
+border: none;
+}
+
+/* =========================================================
+MODEL ACTION BUTTON
+========================================================= */
+
+#ProjectsTable QPushButton#HeaderIcon {
+min-width: 32px;
+min-height: 32px;
+
+```
+background: transparent;
+
+border: none;
+border-radius: 7px;
+
+color: #64748B;
+
+font-size: 18px;
+```
+
+}
+
+#ProjectsTable QPushButton#HeaderIcon:hover {
+background: #1E293B;
+color: #F8FAFC;
+}
+
+/* =========================================================
+MODEL MENU
+========================================================= */
+
+QMenu {
+background: #111827;
+
+```
+border: 1px solid #334155;
+
+border-radius: 8px;
+
+padding: 5px;
+```
+
+}
+
+QMenu::item {
+padding: 8px 28px 8px 12px;
+
+```
+color: #CBD5E1;
+
+border-radius: 6px;
+```
+
+}
+
+QMenu::item:selected {
+background: #1E293B;
+
+```
+color: #F8FAFC;
+```
+
+}
+
+QMenu::separator {
+height: 1px;
+
+```
+background: #1E293B;
+
+margin: 5px 8px;
+```
+
+}
